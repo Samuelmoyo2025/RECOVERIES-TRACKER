@@ -1,0 +1,1557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recoveries Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --brand:#0f5c5d; --brand-strong:#0b4546; --brand-soft:#e3f0ef; --accent:#d97706;
+  --bg:#f5f6f7; --surface:#ffffff; --surface-2:#f0f2f3; --line:#e2e5e8; --line-strong:#cfd4d8;
+  --ink:#16202a; --ink-2:#4a5560; --ink-3:#7b8590;
+  --good:#15803d; --good-soft:#e7f5ec; --warn:#b45309; --warn-soft:#fdf2e3; --bad:#b91c1c; --bad-soft:#fdeaea; --info:#1d4ed8; --info-soft:#e8eefc;
+  --c-collected:#0f6e6f; --c-outstanding:#e7a24a;
+  --radius:10px; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--brand)}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.muted{color:var(--ink-3)} .small{font-size:12px}
+.hidden{display:none!important}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:10px;align-items:center;padding:18px 18px 14px}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+.brand b{display:block;font-size:15px}
+.brand span{font-size:12px;color:var(--ink-3)}
+.nav{padding:6px 10px;flex:1;overflow:auto}
+.nav button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;padding:9px 14px;border-radius:999px;cursor:pointer;color:var(--ink-2);font-weight:500;margin:1px 0}
+.nav button:hover{background:var(--surface-2)}
+.nav button.on{background:var(--brand-soft);color:var(--brand-strong);font-weight:600}
+.nav svg{width:18px;height:18px;flex:none}
+.nav .badge{margin-left:auto;background:var(--bad);color:#fff;font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;min-width:20px;text-align:center}
+.nav .badge.soft{background:var(--surface-2);color:var(--ink-2)}
+.nav .sep{height:1px;background:var(--line);margin:10px 8px}
+.me{border-top:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:10px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--brand-soft);color:var(--brand-strong);display:grid;place-items:center;font-weight:600;font-size:12px;flex:none}
+.me .who{flex:1;min-width:0}
+.me .who b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .who span{font-size:11px;color:var(--ink-3);text-transform:capitalize}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.top h1{font-size:18px;margin:0;font-weight:650;flex:1}
+.search{position:relative;width:min(340px,40vw)}
+.search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2)}
+.search svg{position:absolute;left:11px;top:9px;width:16px;height:16px;color:var(--ink-3)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;background:var(--surface)}
+.seg button{all:unset;padding:6px 14px;cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-2)}
+.seg button.on{background:var(--brand);color:#fff}
+.content{padding:24px 28px 60px;max-width:1500px;width:100%}
+.banner{background:var(--warn-soft);color:var(--warn);padding:8px 28px;font-size:13px;border-bottom:1px solid #f4dcb8}
+.top .menu-btn{display:none}
+
+/* ---------- generic ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);background:var(--surface);padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:550;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-strong)}
+.btn.danger{color:var(--bad);border-color:#efc4c4}
+.btn.good{background:var(--good);border-color:var(--good);color:#fff}
+.btn.sm{padding:4px 10px;font-size:12.5px;border-radius:7px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:15px;height:15px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-h h3{margin:0;font-size:14.5px;font-weight:650;flex:1}
+.card-b{padding:16px 18px}
+.grid{display:grid;gap:16px}
+.grid>*{min-width:0}
+.g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.open{background:var(--info-soft);color:var(--info)}
+.pill.partial{background:var(--warn-soft);color:var(--warn)}
+.pill.recovered,.pill.verified{background:var(--good-soft);color:var(--good)}
+.pill.written_off,.pill.rejected{background:var(--bad-soft);color:var(--bad)}
+.pill.pending{background:var(--warn-soft);color:var(--warn)}
+.pill.grey{background:var(--surface-2);color:var(--ink-2)}
+.age{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.age.a0{background:#eef6f6;color:#1f5f60}.age.a1{background:#fdf6e3;color:#8a6100}.age.a2{background:#fdefd9;color:#9a5300}.age.a3{background:#fde4cc;color:#a14700}.age.a4{background:#fbd5c0;color:#a23a12}.age.a5{background:#f8c4b8;color:#992516}.age.a6{background:#f3b0ae;color:#8b1414}
+.empty{padding:40px;text-align:center;color:var(--ink-3)}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar select,.toolbar input[type=text],.toolbar input[type=search]{padding:7px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);min-width:140px}
+label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-weight:500;color:var(--ink-2)}
+
+/* ---------- KPIs ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .l{font-size:12px;color:var(--ink-3);font-weight:550;text-transform:uppercase;letter-spacing:.03em}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--ink-3);margin-top:2px}
+.kpi.alert .v{color:var(--bad)}
+.kpi.click{cursor:pointer} .kpi.click:hover{border-color:var(--line-strong)}
+
+/* ---------- charts ---------- */
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.hbar{display:grid;grid-template-columns:140px 1fr 190px;gap:12px;align-items:center;padding:6px 0;cursor:default}
+.hbar .nm{font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar .track{display:flex;gap:2px;height:14px}
+.hbar .seg1{background:var(--c-collected);border-radius:4px 0 0 4px}
+.hbar .seg2{background:var(--c-outstanding);border-radius:0 4px 4px 0}
+.hbar .seg1:last-child{border-radius:4px}.hbar .seg2:first-child{border-radius:4px}
+.hbar .vals{font-size:12px;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums}
+.hbar:hover .nm{color:var(--brand)}
+.vbars{display:flex;align-items:flex-end;gap:10px;height:180px;padding-top:10px;border-bottom:1px solid var(--line-strong)}
+.vbars .col{min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:default}
+.vbars .bar{width:100%;max-width:46px;background:var(--brand);border-radius:4px 4px 0 0;min-height:2px}
+.vbars .col:hover .bar{filter:brightness(1.15)}
+.vbars .top-l{font-size:11px;color:var(--ink-2);margin-bottom:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vlabels{display:flex;gap:10px;margin-top:6px}
+.vlabels div{flex:1;text-align:center;font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tip{position:fixed;pointer-events:none;background:#1b2530;color:#fff;font-size:12px;padding:7px 10px;border-radius:7px;z-index:200;max-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.2);display:none;white-space:pre-line}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 240px)}
+table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+table.t th{position:sticky;top:0;background:var(--surface-2);text-align:left;font-weight:600;color:var(--ink-2);padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;z-index:1}
+table.t th.sortable{cursor:pointer} table.t th.sortable:hover{color:var(--ink)}
+table.t td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t tbody tr.click{cursor:pointer}
+table.t tbody tr.click:hover td{background:#f8fafa}
+table.t tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-weight:650;border-top:1px solid var(--line-strong)}
+td.wrap{max-width:240px;white-space:normal}
+td.ref{white-space:nowrap}
+.why.mini{font-size:10.5px;padding:1px 6px;display:inline-block;margin-top:3px}
+td.clip{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prog{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;min-width:60px}
+.prog>i{display:block;height:100%;background:var(--good)}
+
+/* ---------- drawer & modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(15,23,30,.35);z-index:50;display:none}
+.scrim.on{display:block}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100vw);background:var(--surface);z-index:60;box-shadow:-8px 0 30px rgba(0,0,0,.15);transform:translateX(105%);transition:transform .22s ease;display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.drawer .dh{padding:18px 22px;border-bottom:1px solid var(--line)}
+.drawer .db{flex:1;overflow:auto;padding:18px 22px}
+.x{all:unset;cursor:pointer;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2)}
+.x:hover{background:var(--surface-2)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 18px;margin:14px 0}
+.facts>div>span:first-child{display:block;font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.03em}
+.facts div b{font-weight:600;word-break:break-word}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 12px}
+.tabs button{all:unset;padding:8px 12px;cursor:pointer;color:var(--ink-3);font-weight:600;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--brand);border-color:var(--brand)}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.tl .ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;background:var(--surface-2)}
+.tl .ic.rcpt{background:var(--good-soft);color:var(--good)}
+.tl .ic.promise{background:var(--warn-soft);color:var(--warn)}
+.tl .meta{font-size:12px;color:var(--ink-3)}
+.modal-wrap{position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:60px 16px;background:rgba(15,23,30,.4);overflow:auto}
+.modal-wrap.on{display:flex}
+.modal{background:var(--surface);border-radius:12px;width:min(620px,100%);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal.wide{width:min(980px,100%)}
+.modal .mh{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal .mh h3{margin:0;flex:1;font-size:16px}
+.modal .mb{padding:18px 20px}
+.modal .mf{display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line);background:var(--surface-2);border-radius:0 0 12px 12px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.form .full{grid-column:1/-1}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.form input,.form select,.form textarea{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);font-weight:400;color:var(--ink)}
+.form textarea{min-height:70px;resize:vertical}
+.form input:focus,.form select:focus,.form textarea:focus,.toolbar select:focus{outline:2px solid #9cc9c8;outline-offset:0;border-color:var(--brand)}
+.hint{font-size:12px;color:var(--ink-3);font-weight:400}
+.note{padding:10px 12px;border-radius:8px;background:var(--info-soft);color:#1e3a8a;font-size:13px}
+.note.good{background:var(--good-soft);color:#14532d}
+.note.warn{background:var(--warn-soft);color:#7c2d12}
+.note.bad{background:var(--bad-soft);color:#7f1d1d}
+.drop{border:2px dashed var(--line-strong);border-radius:10px;padding:26px;text-align:center;color:var(--ink-2);cursor:pointer;background:var(--surface-2)}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
+#toasts{position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{background:#1b2530;color:#fff;padding:10px 16px;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.2);font-size:13.5px;max-width:380px}
+.toast.good{background:var(--good)} .toast.bad{background:var(--bad)}
+
+/* ---------- reminders ---------- */
+.rem{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.rem:last-child{border-bottom:0}
+.rem .why{font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.why.p1{background:#f1f2f4;color:#374151}.why.p2{background:var(--bad-soft);color:var(--bad)}.why.p3{background:var(--warn-soft);color:var(--warn)}.why.p4{background:var(--info-soft);color:var(--info)}.why.p5{background:var(--surface-2);color:var(--ink-2)}
+.rem>*{min-width:0}
+.rem h4{margin:0;font-size:14px;overflow-wrap:anywhere}
+.rem .acts{flex-wrap:wrap}
+.rem .acts{display:flex;gap:6px}
+
+/* ---------- auth ---------- */
+.auth{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(160deg,#0f5c5d 0%,#0b3b3c 100%)}
+.auth .box{background:var(--surface);border-radius:14px;padding:30px;width:min(440px,100%);box-shadow:0 30px 60px rgba(0,0,0,.25)}
+.auth h2{margin:10px 0 4px}
+.auth .form{grid-template-columns:1fr}
+.demo-users{display:grid;gap:6px;margin-top:14px}
+.demo-users button{all:unset;display:flex;justify-content:space-between;padding:9px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.demo-users button:hover{border-color:var(--brand);background:var(--brand-soft)}
+
+@media (max-width:1100px){.g2,.g3{grid-template-columns:1fr}.facts{grid-template-columns:1fr 1fr}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:260px;z-index:70;transform:translateX(-105%);transition:transform .2s}
+  .side.on{transform:none}
+  .top .menu-btn{display:inline-grid}
+  .top{padding:12px 16px}.content{padding:16px 16px 60px}
+  .search{display:none}
+  .hbar{grid-template-columns:96px 1fr;}.hbar .vals{grid-column:1/-1;text-align:left}
+  .form{grid-template-columns:1fr}
+  .rem{grid-template-columns:1fr}
+  .vbars,.vlabels{gap:4px}.vbars .top-l{display:none}.card-h{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="tip"></div>
+<div id="toasts"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Recovery details"></aside>
+<div class="modal-wrap" id="modal"></div>
+
+<script>
+/* =====================================================================
+   CONFIGURATION — paste your Supabase project URL and anon key here.
+   Leave blank to run in DEMO mode (data kept in this browser only).
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://smgjvsfxmcwbkbwqwgqy.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_i851W9Ht-9l_kDIxwRLgTQ_Yty82Xid',
+  COMPANY: 'Zimnat General Insurance'
+};
+
+/* ---------------------------------------------------------------------
+   Constants
+   --------------------------------------------------------------------- */
+const ROLES = {admin:'Admin', finance:'Finance', claims:'Claims', credit_control:'Credit control', viewer:'Viewer'};
+const AGING = [[30,'0–30 days'],[60,'31–60 days'],[90,'61–90 days'],[120,'91–120 days'],[180,'121–180 days'],[365,'181–365 days'],[Infinity,'365+ days']];
+const METHODS = ['Bank transfer','Offset','Export proceeds','Cash','Other'];
+const BANKS = ['ZB Bank','Stanbic Bank','CBZ Bank','FBC Bank','NMB Bank','CABS','Steward Bank','BancABC','Nedbank','First Capital Bank','Ecobank','POSB','Agribank','Metbank','Stanbic Export','Offset'];
+const ARRANGEMENTS = ['Facultative','Quota Share','Surplus Treaty','XOL','Treaty','Retained'];
+const KINDS = {call:'Phone call', email:'Email', meeting:'Meeting', note:'Note', promise:'Payment promise', reassign:'Reassigned', system:'System'};
+const KIND_IC = {call:'☎', email:'✉', meeting:'👥', note:'✎', promise:'⏱', reassign:'⇄', system:'•'};
+const REASONS = {1:'Unassigned',2:'Promise missed',3:'Follow-up due',4:'New – not yet actioned',5:'No follow-up logged'};
+const DEMO_CONTROLLERS = ['B. Mugandi','D. Dzvene','P. Mugumanya','M. Makumbe','V. Zambuko','V. Mazhindu'];
+const DEMO_REINSURERS = ['AFC','CBZ','Emeritus Re','FBC Re','First Mutual Re','Grand Re','ICZ','Minerva Re','Bright Re','Capital Re','ZB Re'];
+
+const ICONS = {
+  dash:'<path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/>',
+  bell:'<path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2m6-6V11a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1z"/>',
+  list:'<path d="M3 5h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7zm-4 6h2v2H3zm4 0h14v2H7z"/>',
+  plus:'<path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/>',
+  check:'<path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/>',
+  archive:'<path d="M20.5 5.2 19.1 3.5A1.4 1.4 0 0 0 18 3H6c-.4 0-.8.2-1.1.5L3.5 5.2A2 2 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.5-.2-.9-.5-1.3M12 17.5 6.5 12H10v-2h4v2h3.5zM5.1 5l.8-1h12l.9 1z"/>',
+  report:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9zM8 13h8v2H8zm0 4h8v2H8z"/>',
+  audit:'<path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9.1.1L9 12H6a7 7 0 1 1 2.1 5l-1.4 1.4A9 9 0 1 0 13 3m-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8z"/>',
+  gear:'<path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.7a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.7a7 7 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7"/>',
+  search:'<path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 14 15.5l.3.3v.8l5 5 1.5-1.5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9"/>',
+  dl:'<path d="M5 20h14v-2H5zM19 9h-4V3H9v6H5l7 7z"/>',
+  up:'<path d="M5 20h14v-2H5zM9 16h6v-6h4l-7-7-7 7h4z"/>',
+  menu:'<path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/>',
+  out:'<path d="M10 17v-3H3v-4h7V7l5 5zm2-15h7a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-7v-2h7V4h-7z"/>'
+};
+const icon = n => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICONS[n]}</svg>`;
+
+/* ---------------------------------------------------------------------
+   Utilities
+   --------------------------------------------------------------------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2) + Date.now());
+const round2 = n => Math.round((+n || 0) * 100) / 100;
+const fmt = (n, d = 2) => (n == null || isNaN(n)) ? '–' : Number(n).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtK = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e6 ? (n/1e6).toFixed(a >= 1e7 ? 1 : 2) + 'M' : a >= 1e3 ? (n/1e3).toFixed(a >= 1e5 ? 0 : 1) + 'K' : n.toFixed(0); };
+const pct = n => (n == null || isNaN(n)) ? '–' : (n * 100).toFixed(n > 0 && n < 0.1 ? 1 : 0) + '%';
+const pad = n => String(n).padStart(2, '0');
+const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayISO = () => isoOf(new Date());
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
+const daysSince = iso => iso ? Math.floor((new Date(todayISO() + 'T00:00:00') - new Date(String(iso).slice(0, 10) + 'T00:00:00')) / 864e5) : null;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fdate = iso => { if (!iso) return '–'; const s = String(iso).slice(0, 10).split('-'); return `${s[2]} ${MON[+s[1] - 1]} ${s[0]}`; };
+const fdt = ts => { if (!ts) return '–'; const d = new Date(ts); return `${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const num = v => { if (v == null || v === '') return null; if (typeof v === 'number') return v; const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; };
+const initials = s => String(s || '?').split(/[\s.]+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('');
+const agingIndex = d => AGING.findIndex(a => d <= a[0]);
+const agingChip = d => { if (d == null) return ''; const i = agingIndex(d); return `<span class="age a${i}" title="${AGING[i][1]}">${d}d</span>`; };
+const by = (k, dir = 1) => (a, b) => { const x = typeof k === 'function' ? k(a) : a[k], y = typeof k === 'function' ? k(b) : b[k]; return (x > y ? 1 : x < y ? -1 : 0) * dir; };
+const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const store = { get(k, d) { try { const v = localStorage.getItem('rrt_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v) { try { localStorage.setItem('rrt_' + k, JSON.stringify(v)); } catch {} } };
+
+function toast(msg, type = '') {
+  const el = document.createElement('div'); el.className = 'toast ' + type; el.textContent = msg;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), type === 'bad' ? 6000 : 3500);
+}
+
+/* ---------------------------------------------------------------------
+   DATA LAYER — one interface, two backends (Supabase or browser demo)
+   --------------------------------------------------------------------- */
+const MODE = (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) ? 'supabase' : 'demo';
+let sb = null;
+
+/* ---- tiny IndexedDB for demo-mode POP files ---- */
+const idb = {
+  db: null,
+  open() { return this.db ? Promise.resolve(this.db) : new Promise((res, rej) => {
+    const r = indexedDB.open('rrt_pops', 1); r.onupgradeneeded = () => r.result.createObjectStore('f');
+    r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); }); },
+  async put(k, v) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('f', 'readwrite'); t.objectStore('f').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
+  async get(k) { const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction('f').objectStore('f').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+};
+
+/* ---- shared business rule: status follows the money (mirrors the DB trigger) ---- */
+function applyStatus(r) {
+  if (r.status !== 'written_off') {
+    if (r.recovery_amount > 0 && r.recovered_to_date >= r.recovery_amount - 0.005) r.status = 'recovered';
+    else if (r.recovered_to_date > 0) r.status = 'partial';
+    else r.status = 'open';
+  }
+  if (r.status === 'recovered' || r.status === 'written_off') { r.closed_at = r.closed_at || new Date().toISOString(); r.next_follow_up = null; }
+  else r.closed_at = null;
+  return r;
+}
+
+const Demo = {
+  KEY: 'rrt_demo_v1', d: null,
+  load() {
+    if (this.d) return this.d;
+    try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch { this.d = null; }
+    if (!this.d) { this.d = this.seed(); this.save(); }
+    return this.d;
+  },
+  seed() {
+    const p = (full_name, role, controller_name = null) => ({id: uid(), email: full_name.toLowerCase().replace(/[^a-z]+/g, '.') + '@demo.local', full_name, role, controller_name, active: true, email_reminders: true});
+    const profiles = [p('Samuel Moyo', 'admin'), p('Finance Officer', 'finance'), p('Claims Officer', 'claims'), p('Management (read-only)', 'viewer'),
+      ...DEMO_CONTROLLERS.map(n => p(n, 'credit_control', n))];
+    return {seq: 0, profiles, reinsurers: DEMO_REINSURERS.map(name => ({id: uid(), name, active: true, default_controller: null, contact_email: '', contact_name: ''})),
+      settings: {follow_up_days: 7, promise_grace_days: 0, require_pop: true}, recoveries: [], receipts: [], activities: [], audit: []};
+  },
+  save() {
+    try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); }
+    catch (e) { toast('Browser storage is full — demo data could not be saved. Connect Supabase for real use.', 'bad'); }
+  },
+  audit(table, id, action, changed) { this.d.audit.push({id: this.d.audit.length + 1, table_name: table, record_id: id, action, changed, actor: S.me?.id, at: new Date().toISOString()}); if (this.d.audit.length > 20000) this.d.audit.splice(0, 2000); },
+  diff(o, n) { const d = {}; for (const k in n) if (!['updated_at','updated_by'].includes(k) && JSON.stringify(o[k]) !== JSON.stringify(n[k])) d[k] = {from: o[k] ?? null, to: n[k] ?? null}; return d; },
+  recompute(rid) {
+    const r = this.d.recoveries.find(x => x.id === rid); if (!r) return;
+    const before = {...r};
+    r.recovered_to_date = round2(this.d.receipts.filter(c => c.recovery_id === rid && c.status !== 'rejected').reduce((s, c) => s + +c.amount, 0));
+    applyStatus(r); r.updated_at = new Date().toISOString();
+    const df = this.diff(before, r); if (Object.keys(df).length) this.audit('recoveries', rid, 'update', df);
+  }
+};
+
+const API = {
+  /* ---------- auth ---------- */
+  async session() {
+    if (MODE === 'demo') { const id = store.get('demo_user'); return id ? {user: {id}} : null; }
+    const {data} = await sb.auth.getSession(); return data.session;
+  },
+  async signIn(email, password) {
+    const {error} = await sb.auth.signInWithPassword({email, password}); if (error) throw error;
+  },
+  async signUp(email, password, full_name) {
+    const {data, error} = await sb.auth.signUp({email, password, options: {data: {full_name}}}); if (error) throw error; return data;
+  },
+  async resetPassword(email) { const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.href.split('#')[0]}); if (error) throw error; },
+  async signOut() { if (MODE === 'demo') { store.set('demo_user', null); return; } await sb.auth.signOut(); },
+
+  /* ---------- load everything (hundreds–thousands of rows: fine in memory) ---------- */
+  async fetchAll(table, order = 'created_at') {
+    const out = []; const size = 1000;
+    for (let from = 0; ; from += size) {
+      const {data, error} = await sb.from(table).select('*').order(order, {ascending: true}).range(from, from + size - 1);
+      if (error) throw error; out.push(...data); if (data.length < size) break;
+    }
+    return out;
+  },
+  async loadAll() {
+    if (MODE === 'demo') { const d = Demo.load(); return JSON.parse(JSON.stringify({profiles: d.profiles, reinsurers: d.reinsurers, settings: d.settings, recoveries: d.recoveries, receipts: d.receipts, activities: d.activities})); }
+    const [profiles, reinsurers, recoveries, receipts, activities, st] = await Promise.all([
+      this.fetchAll('profiles'), this.fetchAll('reinsurers', 'name'), this.fetchAll('recoveries'), this.fetchAll('receipts'), this.fetchAll('activities'),
+      sb.from('settings').select('*').eq('id', 1).single()]);
+    return {profiles, reinsurers, recoveries, receipts, activities, settings: st.data || {follow_up_days: 7, promise_grace_days: 0, require_pop: true}};
+  },
+
+  /* ---------- writes ---------- */
+  async insertRecoveries(rows) {
+    if (MODE === 'demo') {
+      const now = new Date().toISOString();
+      const out = rows.map(r => { const x = applyStatus({recovered_to_date: 0, status: 'open', source: 'manual', ...r, id: r.id || uid(), ref: 'REC-' + String(++Demo.d.seq).padStart(6, '0'), created_by: S.me.id, created_at: r.created_at || now, updated_at: now});
+        Demo.d.recoveries.push(x); Demo.audit('recoveries', x.id, 'insert', {...x}); return x; });
+      Demo.save(); return out;
+    }
+    const out = [];
+    for (let i = 0; i < rows.length; i += 250) {
+      const {data, error} = await sb.from('recoveries').insert(rows.slice(i, i + 250)).select(); if (error) throw error; out.push(...data);
+    }
+    return out;
+  },
+  async updateRecovery(id, patch) {
+    if (MODE === 'demo') {
+      const r = Demo.d.recoveries.find(x => x.id === id); const before = {...r};
+      Object.assign(r, patch, {updated_at: new Date().toISOString(), updated_by: S.me.id}); applyStatus(r);
+      const df = Demo.diff(before, r); if (Object.keys(df).length) Demo.audit('recoveries', id, 'update', df);
+      Demo.save(); return r;
+    }
+    const {data, error} = await sb.from('recoveries').update(patch).eq('id', id).select().single(); if (error) throw error; return data;
+  },
+  async uploadPop(recoveryId, file) {
+    const safe = file.name.replace(/[^\w.\-]+/g, '_').slice(-80);
+    const path = `${recoveryId}/${Date.now()}-${safe}`;
+    if (MODE === 'demo') { await idb.put(path, file); return {pop_path: path, pop_name: file.name}; }
+    const {error} = await sb.storage.from('pops').upload(path, file, {upsert: false, contentType: file.type || 'application/octet-stream'});
+    if (error) throw error; return {pop_path: path, pop_name: file.name};
+  },
+  async popUrl(path) {
+    if (MODE === 'demo') { const f = await idb.get(path); return f ? URL.createObjectURL(f) : null; }
+    const {data, error} = await sb.storage.from('pops').createSignedUrl(path, 300); if (error) throw error; return data.signedUrl;
+  },
+  async insertReceipts(rows) {
+    if (MODE === 'demo') {
+      const out = rows.map(r => { const x = {status: 'pending', ...r, id: uid(), created_by: S.me.id, created_at: r.created_at || new Date().toISOString()}; Demo.d.receipts.push(x); Demo.audit('receipts', x.id, 'insert', {...x}); return x; });
+      [...new Set(rows.map(r => r.recovery_id))].forEach(id => Demo.recompute(id)); Demo.save(); return out;
+    }
+    const out = [];
+    for (let i = 0; i < rows.length; i += 250) { const {data, error} = await sb.from('receipts').insert(rows.slice(i, i + 250)).select(); if (error) throw error; out.push(...data); }
+    return out;
+  },
+  async updateReceipt(id, patch) {
+    if (MODE === 'demo') {
+      const c = Demo.d.receipts.find(x => x.id === id); const before = {...c}; Object.assign(c, patch);
+      Demo.audit('receipts', id, 'update', Demo.diff(before, c)); Demo.recompute(c.recovery_id); Demo.save(); return c;
+    }
+    const {data, error} = await sb.from('receipts').update(patch).eq('id', id).select().single(); if (error) throw error; return data;
+  },
+  async insertActivities(rows) {
+    if (MODE === 'demo') { rows.forEach(r => Demo.d.activities.push({kind: 'note', ...r, id: uid(), created_by: r.created_by || S.me.id, created_at: r.created_at || new Date().toISOString()})); Demo.save(); return; }
+    for (let i = 0; i < rows.length; i += 250) { const {error} = await sb.from('activities').insert(rows.slice(i, i + 250)); if (error) throw error; }
+  },
+  async addReinsurers(names) {
+    const have = new Set(S.reinsurers.map(r => r.name.toLowerCase()));
+    const fresh = [...new Set(names.filter(n => n && !have.has(n.toLowerCase())))];
+    if (!fresh.length) return;
+    if (MODE === 'demo') { fresh.forEach(name => { const x = {id: uid(), name, active: true, default_controller: null, contact_email: '', contact_name: ''}; Demo.d.reinsurers.push(x); Demo.audit('reinsurers', x.id, 'insert', x); }); Demo.save(); }
+    else { const {error} = await sb.from('reinsurers').upsert(fresh.map(name => ({name})), {onConflict: 'name', ignoreDuplicates: true}); if (error) throw error; }
+    fresh.forEach(name => S.reinsurers.push({name, active: true}));
+  },
+  async updateReinsurer(id, patch) {
+    if (MODE === 'demo') {
+      const r = Demo.d.reinsurers.find(x => x.id === id); const before = {...r};
+      if (patch.name && patch.name !== r.name) Demo.d.recoveries.forEach(x => { if (x.reinsurer === r.name) x.reinsurer = patch.name; });
+      Object.assign(r, patch); Demo.audit('reinsurers', id, 'update', Demo.diff(before, r)); Demo.save(); return;
+    }
+    const {error} = await sb.from('reinsurers').update(patch).eq('id', id); if (error) throw error;
+  },
+  async setDefaultController(name, who) {
+    if (MODE === 'demo') { const r = Demo.d.reinsurers.find(x => x.name === name); if (r) { Demo.audit('reinsurers', r.id, 'update', {default_controller: {from: r.default_controller, to: who}}); r.default_controller = who; Demo.save(); } return; }
+    const {error} = await sb.from('reinsurers').update({default_controller: who}).eq('name', name); if (error) throw error;
+  },
+  async mergeReinsurer(fromName, toName) {
+    const ids = S.recoveries.filter(r => r.reinsurer === fromName).map(r => r.id);
+    if (MODE === 'demo') { ids.forEach(id => { const r = Demo.d.recoveries.find(x => x.id === id); Demo.audit('recoveries', id, 'update', {reinsurer: {from: fromName, to: toName}}); r.reinsurer = toName; });
+      const ri = Demo.d.reinsurers.find(x => x.name === fromName); if (ri) ri.active = false; Demo.save(); return ids.length; }
+    for (let i = 0; i < ids.length; i += 200) { const {error} = await sb.from('recoveries').update({reinsurer: toName}).in('id', ids.slice(i, i + 200)); if (error) throw error; }
+    await sb.from('reinsurers').update({active: false}).eq('name', fromName);
+    return ids.length;
+  },
+  async updateProfile(id, patch) {
+    if (MODE === 'demo') { const p = Demo.d.profiles.find(x => x.id === id); const before = {...p}; Object.assign(p, patch); Demo.audit('profiles', id, 'update', Demo.diff(before, p)); Demo.save(); return; }
+    const {error} = await sb.from('profiles').update(patch).eq('id', id); if (error) throw error;
+  },
+  async addDemoProfile(row) { const x = {id: uid(), active: true, email_reminders: true, ...row}; Demo.d.profiles.push(x); Demo.save(); return x; },
+  async updateSettings(patch) {
+    if (MODE === 'demo') { Object.assign(Demo.d.settings, patch); Demo.save(); return; }
+    const {error} = await sb.from('settings').update({...patch, updated_at: new Date().toISOString(), updated_by: S.me.id}).eq('id', 1); if (error) throw error;
+  },
+  async audit({recordIds, limit = 400} = {}) {
+    if (MODE === 'demo') { let a = Demo.d.audit; if (recordIds) a = a.filter(x => recordIds.includes(x.record_id)); return a.slice(-limit).reverse(); }
+    let q = sb.from('audit_log').select('*').order('id', {ascending: false}).limit(limit);
+    if (recordIds) q = q.in('record_id', recordIds);
+    const {data, error} = await q; if (error) throw error; return data;
+  },
+  subscribe(cb) {
+    if (MODE !== 'supabase') return;
+    sb.channel('rrt-live').on('postgres_changes', {event: '*', schema: 'public'}, cb).subscribe();
+  }
+};
+
+/* ---------------------------------------------------------------------
+   STATE & DERIVED DATA
+   --------------------------------------------------------------------- */
+const S = {
+  me: null, profiles: [], reinsurers: [], settings: {}, recoveries: [], receipts: [], activities: [],
+  view: store.get('view', 'dashboard'), ccy: store.get('ccy', 'USD'),
+  f: {q: '', reinsurer: '', controller: '', aging: '', status: 'active', mine: null},
+  sort: {key: 'date_sent', dir: 1}, archSort: {key: 'closed_at', dir: -1}, drawerId: null
+};
+const role = () => S.me?.role || 'viewer';
+const can = {
+  create: () => ['admin','finance','claims'].includes(role()),
+  edit: () => ['admin','finance','claims'].includes(role()),
+  receipt: () => ['admin','finance','credit_control'].includes(role()),
+  verify: () => ['admin','finance'].includes(role()),
+  followup: () => ['admin','finance','claims','credit_control'].includes(role()),
+  writeoff: () => ['admin','finance'].includes(role()),
+  admin: () => role() === 'admin'
+};
+const profileName = id => S.profiles.find(p => p.id === id)?.full_name || (id ? 'Unknown user' : 'System');
+const controllers = () => {
+  const set = new Set(S.profiles.filter(p => p.role === 'credit_control' && p.active && p.controller_name).map(p => p.controller_name));
+  S.recoveries.forEach(r => r.responsible && set.add(r.responsible));
+  return [...set].sort();
+};
+const activeReinsurers = () => [...new Set(S.reinsurers.filter(r => r.active !== false).map(r => r.name))].sort((a, b) => a.localeCompare(b));
+
+function derive() {
+  const rc = {}, ac = {};
+  S.receipts.forEach(c => (rc[c.recovery_id] ||= []).push(c));
+  S.activities.forEach(a => (ac[a.recovery_id] ||= []).push(a));
+  const st = S.settings, today = todayISO();
+  for (const r of S.recoveries) {
+    r.claim_amount = +r.claim_amount; r.recovery_amount = +r.recovery_amount; r.ri_share = +r.ri_share;
+    const rcs = (rc[r.id] || []).sort(by('created_at')); const acs = (ac[r.id] || []).sort(by('created_at'));
+    r._receipts = rcs; r._acts = acs;
+    r._rec = round2(rcs.filter(c => c.status !== 'rejected').reduce((s, c) => s + +c.amount, 0));
+    r._out = round2(r.recovery_amount - r._rec);
+    r._pct = r.recovery_amount ? r._rec / r.recovery_amount : 0;
+    r._pending = round2(rcs.filter(c => c.status === 'pending').reduce((s, c) => s + +c.amount, 0));
+    r._days = daysSince(r.date_sent);
+    r._closed = r.status === 'recovered' || r.status === 'written_off';
+    const human = acs.filter(a => a.kind !== 'system');
+    const lastNote = [...human].reverse().find(a => a.note);
+    r._lastComment = lastNote ? lastNote.note : '';
+    r._lastCommentAt = lastNote ? lastNote.created_at : null;
+    const realRcpts = rcs.filter(c => c.method !== 'Migrated');
+    const lastAct = human.length ? human[human.length - 1].created_at : null;
+    const lastRc = realRcpts.length ? realRcpts[realRcpts.length - 1].created_at : null;
+    r._lastTouch = [lastAct, lastRc, r.created_at].filter(Boolean).sort().pop();
+    const promise = [...human].reverse().find(a => a.kind === 'promise' && a.promise_date);
+    // ----- reminder rules (same as SQL reminder_items) -----
+    r._rem = null;
+    if (!r._closed) {
+      if (!r.responsible) r._rem = {p: 1};
+      else if (promise && addDays(promise.promise_date, +st.promise_grace_days || 0) < today && (!lastRc || lastRc < promise.created_at)) r._rem = {p: 2, detail: 'Promised ' + fdate(promise.promise_date) + (promise.promise_amount ? ' · ' + fmt(promise.promise_amount) : '')};
+      else if (r.next_follow_up && r.next_follow_up <= today) r._rem = {p: 3, detail: 'Due ' + fdate(r.next_follow_up)};
+      else if (!human.length && !rcs.length && r.source !== 'excel_migration') r._rem = {p: 4, detail: 'Uploaded ' + fdt(r.created_at) + ' by ' + profileName(r.created_by)};
+      else if ((!r.next_follow_up || r.next_follow_up <= today) && daysSince(r._lastTouch) > (+st.follow_up_days || 7)) r._rem = {p: 5, detail: 'Last action ' + fdate(r._lastTouch) + ' (' + daysSince(r._lastTouch) + ' days ago)'};
+      if (r._rem) r._rem.reason = REASONS[r._rem.p];
+    }
+  }
+}
+
+async function reload(quiet) {
+  try {
+    const d = await API.loadAll();
+    Object.assign(S, d);
+    if (MODE === 'demo') S.me = S.profiles.find(p => p.id === store.get('demo_user')) || null;
+    else S.me = S.profiles.find(p => p.id === S.me?.id) || S.me;
+    derive();
+    if (!quiet) render(); else if ($('#nav')) { renderNav(); if (!$('#modal').classList.contains('on')) renderView(); if (S.drawerId) renderDrawer(); }
+  } catch (e) { console.error(e); toast('Could not load data: ' + (e.message || e), 'bad'); }
+}
+
+/* ---------------------------------------------------------------------
+   AUTH SCREENS
+   --------------------------------------------------------------------- */
+function renderAuth(msg = '') {
+  const demo = MODE === 'demo';
+  $('#root').innerHTML = `<div class="auth"><div class="box">
+    <div class="brand" style="padding:0"><div class="logo">R</div><div><b>Recoveries Tracker</b><span>${esc(CONFIG.COMPANY)} · Reinsurance recoveries</span></div></div>
+    ${demo ? `
+      <h2>Demo mode</h2>
+      <p class="muted small">No database is connected yet, so data stays in this browser. Pick a person to see the tool from their seat.</p>
+      <div class="demo-users">${Demo.load().profiles.map(p => `<button data-demo="${p.id}"><span>${esc(p.full_name)}</span><span class="muted small">${ROLES[p.role]}</span></button>`).join('')}</div>`
+    : `
+      <h2 id="authTitle">Sign in</h2>
+      <p class="muted small">Use your work email. New accounts start read-only until an admin assigns your role.</p>
+      ${msg ? `<div class="note ${msg.startsWith('!') ? 'bad' : 'good'}" style="margin:10px 0">${esc(msg.replace(/^!/, ''))}</div>` : ''}
+      <form class="form" id="authForm" style="margin-top:14px">
+        <label class="su hidden">Full name<input name="full_name" autocomplete="name"></label>
+        <label>Email<input name="email" type="email" required autocomplete="username"></label>
+        <label class="pw">Password<input name="password" type="password" minlength="8" autocomplete="current-password"></label>
+        <button class="btn primary" style="justify-content:center" id="authGo">Sign in</button>
+      </form>
+      <div class="row small" style="margin-top:12px;justify-content:space-between">
+        <a href="#" id="toSignup">Create an account</a><a href="#" id="toReset">Forgot password?</a>
+      </div>`}
+  </div></div>`;
+  if (demo) { $$('[data-demo]').forEach(b => b.onclick = () => { store.set('demo_user', b.dataset.demo); boot(); }); return; }
+  let mode = 'in';
+  const set = m => { mode = m; $('#authTitle').textContent = {in: 'Sign in', up: 'Create account', reset: 'Reset password'}[m];
+    $('.su').classList.toggle('hidden', m !== 'up'); $('.pw').classList.toggle('hidden', m === 'reset');
+    $('#authGo').textContent = {in: 'Sign in', up: 'Create account', reset: 'Send reset link'}[m]; };
+  $('#toSignup').onclick = e => { e.preventDefault(); set(mode === 'up' ? 'in' : 'up'); };
+  $('#toReset').onclick = e => { e.preventDefault(); set('reset'); };
+  $('#authForm').onsubmit = async e => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); const b = $('#authGo'); b.disabled = true;
+    try {
+      if (mode === 'in') { await API.signIn(f.email, f.password); boot(); }
+      else if (mode === 'up') { await API.signUp(f.email, f.password, f.full_name); renderAuth('Account created. Check your email to confirm, then sign in.'); }
+      else { await API.resetPassword(f.email); renderAuth('Password reset link sent — check your email.'); }
+    } catch (err) { renderAuth('!' + (err.message || err)); }
+  };
+}
+
+/* ---------------------------------------------------------------------
+   SHELL
+   --------------------------------------------------------------------- */
+const VIEWS = [
+  {id: 'dashboard', label: 'Dashboard', icon: 'dash'},
+  {id: 'reminders', label: 'Reminders', icon: 'bell'},
+  {id: 'register', label: 'Recoveries', icon: 'list'},
+  {id: 'new', label: 'Upload claims', icon: 'plus', show: () => can.create()},
+  {id: 'verify', label: 'POP verification', icon: 'check', show: () => can.verify()},
+  {id: 'archive', label: 'Recovered archive', icon: 'archive'},
+  {sep: true},
+  {id: 'reports', label: 'Statements & exports', icon: 'report'},
+  {id: 'audit', label: 'Audit trail', icon: 'audit'},
+  {id: 'settings', label: 'Settings', icon: 'gear', show: () => can.admin()}
+];
+const TITLES = {dashboard: 'Recoveries dashboard', reminders: 'Reminders', register: 'Recoveries register', new: 'Upload claims with reinsurance', verify: 'Proof-of-payment verification', archive: 'Recovered archive', reports: 'Statements & exports', audit: 'Audit trail', settings: 'Settings'};
+
+function myReminders() {
+  const open = S.recoveries.filter(r => r._rem);
+  if (role() === 'credit_control') return open.filter(r => r.responsible === S.me.controller_name);
+  return open;
+}
+
+function render() {
+  $('#root').innerHTML = `
+  ${MODE === 'demo' ? `<div class="banner">Demo mode — data is saved in this browser only. Add your Supabase URL and key in the CONFIG block to go live for the whole team.</div>` : ''}
+  ${role() === 'viewer' && MODE === 'supabase' ? `<div class="banner">You have read-only access. Ask an admin to assign your role (claims, finance or credit control).</div>` : ''}
+  <div class="app">
+    <aside class="side" id="side">
+      <div class="brand"><div class="logo">R</div><div><b>Recoveries</b><span>${esc(CONFIG.COMPANY)}</span></div></div>
+      <nav class="nav" id="nav"></nav>
+      <div class="me"><div class="avatar">${esc(initials(S.me.full_name))}</div>
+        <div class="who"><b>${esc(S.me.full_name)}</b><span>${ROLES[role()]}${S.me.controller_name ? ' · ' + esc(S.me.controller_name) : ''}</span></div>
+        <button class="x" id="signout" title="Sign out">${icon('out')}</button></div>
+    </aside>
+    <div class="main">
+      <header class="top">
+        <button class="x menu-btn" id="menuBtn" title="Menu">${icon('menu')}</button>
+        <h1 id="title"></h1>
+        <div class="search">${icon('search')}<input id="gsearch" type="search" placeholder="Search claim no., client, ref, payee…" value="${esc(S.f.q)}"></div>
+        <div class="seg" id="ccy"><button data-ccy="USD">USD</button><button data-ccy="ZWG">ZWG</button></div>
+      </header>
+      <main class="content" id="view"></main>
+    </div>
+  </div>`;
+  $('#signout').onclick = async () => { await API.signOut(); S.me = null; boot(); };
+  $('#menuBtn').onclick = () => $('#side').classList.toggle('on');
+  $$('#ccy button').forEach(b => b.onclick = () => { S.ccy = b.dataset.ccy; store.set('ccy', S.ccy); renderCcy(); renderView(); });
+  $('#gsearch').oninput = debounce(e => { S.f.q = e.target.value; if (!['register','archive'].includes(S.view)) go('register'); else renderView(); }, 200);
+  renderCcy(); renderNav(); renderView();
+}
+function renderCcy() { $$('#ccy button').forEach(b => b.classList.toggle('on', b.dataset.ccy === S.ccy)); }
+function renderNav() {
+  const remN = myReminders().length, popN = S.receipts.filter(c => c.status === 'pending').length;
+  $('#nav').innerHTML = VIEWS.filter(v => v.sep || !v.show || v.show()).map(v => v.sep ? '<div class="sep"></div>' :
+    `<button data-go="${v.id}" class="${S.view === v.id ? 'on' : ''}">${icon(v.icon)}<span>${v.label}</span>${
+      v.id === 'reminders' && remN ? `<span class="badge">${remN}</span>` : v.id === 'verify' && popN ? `<span class="badge soft">${popN}</span>` : ''}</button>`).join('');
+  $$('#nav [data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+}
+function go(v) { S.view = v; store.set('view', v); $('#side')?.classList.remove('on'); renderNav(); renderView(); window.scrollTo(0, 0); }
+function renderView() {
+  const v = VIEWS.find(x => x.id === S.view && (!x.show || x.show())) ? S.view : 'dashboard'; S.view = v;
+  $('#title').textContent = TITLES[v];
+  ({dashboard: viewDashboard, reminders: viewReminders, register: viewRegister, new: viewNew, verify: viewVerify, archive: viewArchive, reports: viewReports, audit: viewAudit, settings: viewSettings})[v]();
+}
+
+/* tooltips for charts */
+document.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); const tip = $('#tip'); if (!t) { tip.style.display = 'none'; return; } tip.textContent = t.dataset.tip; tip.style.display = 'block'; });
+document.addEventListener('mousemove', e => { const tip = $('#tip'); if (tip.style.display === 'block') { tip.style.left = Math.min(e.clientX + 14, innerWidth - 290) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; } });
+
+/* ---------------------------------------------------------------------
+   DASHBOARD
+   --------------------------------------------------------------------- */
+function viewDashboard() {
+  const C = S.ccy, rows = S.recoveries.filter(r => r.currency === C);
+  const active = rows.filter(r => !r._closed);
+  const recById = Object.fromEntries(rows.map(r => [r.id, r]));
+  const rcpts = S.receipts.filter(c => recById[c.recovery_id] && c.status !== 'rejected');
+  const t = todayISO(), mStart = t.slice(0, 8) + '01', yStart = t.slice(0, 5) + '01-01';
+  const sum = (a, f) => a.reduce((s, x) => s + (+f(x) || 0), 0);
+  const outstanding = sum(active, r => r._out);
+  const mtd = sum(rcpts.filter(c => c.receipt_date >= mStart), c => c.amount);
+  const ytd = sum(rcpts.filter(c => c.receipt_date >= yStart), c => c.amount);
+  const totalDue = sum(rows.filter(r => r.status !== 'written_off'), r => r.recovery_amount), totalRec = sum(rows, r => r._rec);
+  const rem = active.filter(r => r._rem).length;
+  const pend = S.receipts.filter(c => c.status === 'pending' && recById[c.recovery_id]);
+  const over180 = sum(active.filter(r => r._days > 180), r => r._out);
+
+  // by reinsurer
+  const ri = {};
+  rows.filter(r => r.status !== 'written_off').forEach(r => { const k = r.reinsurer || 'Unspecified'; (ri[k] ||= {name: k, col: 0, out: 0, n: 0}); ri[k].col += r._rec; if (!r._closed) { ri[k].out += r._out; ri[k].n++; } });
+  let riList = Object.values(ri).sort((a, b) => (b.out + b.col) - (a.out + a.col));
+  if (riList.length > 10) { const rest = riList.slice(9); riList = riList.slice(0, 9); riList.push({name: `Other (${rest.length})`, col: sum(rest, x => x.col), out: sum(rest, x => x.out), n: sum(rest, x => x.n), other: true}); }
+  const riMax = Math.max(1, ...riList.map(x => x.col + x.out));
+
+  // aging
+  const ag = AGING.map(a => ({label: a[1], amt: 0, n: 0}));
+  active.forEach(r => { const i = agingIndex(r._days ?? 0); ag[i].amt += r._out; ag[i].n++; });
+  const agMax = Math.max(1, ...ag.map(a => a.amt));
+
+  // trend: last 12 months collections
+  const months = []; const d0 = new Date(); d0.setDate(1);
+  for (let i = 11; i >= 0; i--) { const d = new Date(d0.getFullYear(), d0.getMonth() - i, 1); months.push({k: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, label: MON[d.getMonth()] + ' ' + d.getFullYear(), short: MON[d.getMonth()] + (d.getMonth() === 0 || i === 11 ? " '" + String(d.getFullYear()).slice(2) : ''), amt: 0, n: 0}); }
+  rcpts.forEach(c => { const m = months.find(x => x.k === String(c.receipt_date).slice(0, 7)); if (m) { m.amt += +c.amount; m.n++; } });
+  const trMax = Math.max(1, ...months.map(m => m.amt));
+
+  // controllers
+  const ctl = {};
+  rows.forEach(r => { const k = r.responsible || '— Unassigned —'; const x = (ctl[k] ||= {name: k, n: 0, out: 0, mtd: 0, ytd: 0, rem: 0, last: null, closed: 0});
+    if (!r._closed) { x.n++; x.out += r._out; if (r._rem) x.rem++; } else if (r.status === 'recovered') x.closed++;
+    r._receipts.filter(c => c.status !== 'rejected').forEach(c => { if (c.receipt_date >= mStart) x.mtd += +c.amount; if (c.receipt_date >= yStart) x.ytd += +c.amount; });
+    const lt = r._acts.filter(a => a.kind !== 'system').map(a => a.created_at).concat(r._receipts.filter(c => c.method !== 'Migrated').map(c => c.created_at)).sort().pop();
+    if (lt && (!x.last || lt > x.last)) x.last = lt; });
+  const ctlList = Object.values(ctl).sort((a, b) => b.out - a.out);
+
+  const recent = [...rcpts].filter(c => c.method !== 'Migrated').sort(by('created_at', -1)).slice(0, 8);
+
+  $('#view').innerHTML = `
+  <div class="kpis">
+    <div class="kpi click" data-go2="register"><div class="l">Outstanding recoverable</div><div class="v">${C} ${fmtK(outstanding)}</div><div class="s">${active.length} open items · ${C} ${fmt(outstanding)}</div></div>
+    <div class="kpi"><div class="l">Collected this month</div><div class="v">${C} ${fmtK(mtd)}</div><div class="s">${MON[new Date().getMonth()]} ${new Date().getFullYear()}</div></div>
+    <div class="kpi"><div class="l">Collected year to date</div><div class="v">${C} ${fmtK(ytd)}</div><div class="s">since 1 Jan</div></div>
+    <div class="kpi"><div class="l">Recovery rate</div><div class="v">${pct(totalDue ? totalRec / totalDue : 0)}</div><div class="s">${C} ${fmtK(totalRec)} of ${fmtK(totalDue)} ever due</div></div>
+    <div class="kpi ${over180 ? 'alert' : ''}"><div class="l">Older than 180 days</div><div class="v">${C} ${fmtK(over180)}</div><div class="s">${pct(outstanding ? over180 / outstanding : 0)} of outstanding</div></div>
+    <div class="kpi click ${rem ? 'alert' : ''}" data-go2="reminders"><div class="l">Need follow-up</div><div class="v">${rem}</div><div class="s">${active.filter(r => r._rem?.p === 1).length} unassigned · ${active.filter(r => r._rem?.p === 2).length} promises missed</div></div>
+    <div class="kpi click" data-go2="verify"><div class="l">POPs awaiting verification</div><div class="v">${pend.length}</div><div class="s">${C} ${fmt(sum(pend, c => c.amount))}</div></div>
+  </div>
+  ${!S.recoveries.length ? `<div class="card" style="margin-bottom:16px"><div class="card-b"><div class="note">No recoveries yet. ${can.create() ? `Go to <a href="#" data-go2="new">Upload claims</a> to add claims or migrate your existing Excel tracker.` : 'Claims and finance will upload claims with reinsurance here.'}</div></div></div>` : ''}
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card"><div class="card-h"><h3>By reinsurer</h3><div class="legend"><span><i style="background:var(--c-collected)"></i>Collected</span><span><i style="background:var(--c-outstanding)"></i>Outstanding</span></div></div>
+      <div class="card-b">${riList.length ? riList.map(x => `<div class="hbar" ${x.other ? '' : `data-ri="${esc(x.name)}" style="cursor:pointer"`} data-tip="${esc(x.name)}\nCollected: ${C} ${fmt(x.col)}\nOutstanding: ${C} ${fmt(x.out)} (${x.n} open)\nRecovery rate: ${pct((x.col) / ((x.col + x.out) || 1))}">
+        <div class="nm">${esc(x.name)}</div>
+        <div class="track">${x.col ? `<div class="seg1" style="width:${x.col / riMax * 100}%"></div>` : ''}${x.out ? `<div class="seg2" style="width:${x.out / riMax * 100}%"></div>` : ''}</div>
+        <div class="vals">${fmtK(x.col)} collected · <b>${fmtK(x.out)}</b> due</div></div>`).join('') : '<div class="empty">No data</div>'}</div></div>
+    <div class="card"><div class="card-h"><h3>Outstanding by age</h3><span class="muted small">days since sent to finance</span></div>
+      <div class="card-b"><div class="vbars">${ag.map(a => `<div class="col" data-tip="${a.label}\n${C} ${fmt(a.amt)}\n${a.n} item(s)"><div class="top-l">${a.amt ? fmtK(a.amt) : ''}</div><div class="bar" style="height:${a.amt / agMax * 85}%;background:var(--accent)"></div></div>`).join('')}</div>
+      <div class="vlabels">${ag.map(a => `<div>${a.label.replace(' days', '')}</div>`).join('')}</div></div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>By credit controller</h3><span class="muted small">${C} · click a row to open their items</span></div>
+    <div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Controller</th><th class="num">Open items</th><th class="num">Outstanding</th><th class="num">Collected MTD</th><th class="num">Collected YTD</th><th class="num">Fully recovered</th><th class="num">Need follow-up</th><th>Last activity</th></tr></thead>
+    <tbody>${ctlList.map(x => `<tr class="click" data-ctl="${esc(x.name)}"><td><b>${esc(x.name)}</b></td><td class="num">${x.n}</td><td class="num">${fmt(x.out)}</td><td class="num">${fmt(x.mtd)}</td><td class="num">${fmt(x.ytd)}</td><td class="num">${x.closed}</td><td class="num">${x.rem ? `<span class="pill written_off">${x.rem}</span>` : '<span class="pill recovered">0</span>'}</td><td class="muted">${x.last ? fdt(x.last) : '–'}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No data</td></tr>'}</tbody></table></div></div>
+  <div class="grid g2">
+    <div class="card"><div class="card-h"><h3>Collections — last 12 months</h3><span class="muted small">${C}, by receipt date</span></div>
+      <div class="card-b"><div class="vbars">${months.map(m => `<div class="col" data-tip="${m.label}\n${C} ${fmt(m.amt)}\n${m.n} receipt(s)"><div class="top-l">${m.amt ? fmtK(m.amt) : ''}</div><div class="bar" style="height:${m.amt / trMax * 85}%"></div></div>`).join('')}</div>
+      <div class="vlabels">${months.map(m => `<div>${m.short}</div>`).join('')}</div></div></div>
+    <div class="card"><div class="card-h"><h3>Latest recoveries recorded</h3></div>
+      ${recent.length ? `<table class="t"><tbody>${recent.map(c => { const r = recById[c.recovery_id]; return `<tr class="click" data-open="${r.id}"><td><b>${esc(r.reinsurer)}</b><div class="muted small">${esc(r.claim_number)} · ${esc(r.client_name)}</div></td><td class="num"><b>${fmt(c.amount)}</b><div class="muted small">${fdate(c.receipt_date)}</div></td><td><span class="pill ${c.status}">${c.status}</span></td></tr>`; }).join('')}</tbody></table>` : '<div class="empty">No recoveries recorded yet</div>'}
+    </div>
+  </div>`;
+  $$('#view [data-go2]').forEach(b => b.onclick = e => { e.preventDefault(); go(b.dataset.go2); });
+  $$('#view [data-ri]').forEach(b => b.onclick = () => { S.f = {...S.f, reinsurer: b.dataset.ri, controller: '', aging: '', status: 'active', mine: false}; go('register'); });
+  $$('#view [data-ctl]').forEach(b => b.onclick = () => { S.f = {...S.f, controller: b.dataset.ctl === '— Unassigned —' ? '__none' : b.dataset.ctl, reinsurer: '', aging: '', status: 'active', mine: false}; go('register'); });
+  bindOpen();
+}
+function bindOpen(root = $('#view')) { $$('[data-open]', root).filter(el => el.tagName !== 'A').forEach(el => el.onclick = e => { if (e.target.closest('button,a')) return; openDrawer(el.dataset.open); }); }
+
+/* ---------------------------------------------------------------------
+   REMINDERS
+   --------------------------------------------------------------------- */
+function viewReminders() {
+  const list = myReminders().sort((a, b) => a._rem.p - b._rem.p || b._out - a._out);
+  const groups = {};
+  list.forEach(r => (groups[r.responsible || '— Unassigned —'] ||= []).push(r));
+  const isCC = role() === 'credit_control';
+  if (isCC && !S.me.controller_name) { $('#view').innerHTML = `<div class="note warn">Your profile is not linked to a controller name yet. Ask an admin to set your “Responsible” name in Settings → Users.</div>`; return; }
+  $('#view').innerHTML = `
+    <div class="note" style="margin-bottom:16px">${isCC ? `These are <b>your</b> recoveries that need action today.` : `All recoveries needing action across the team.`}
+      Items stay here until someone logs a follow-up, records a recovery, or sets a later follow-up date. ${MODE === 'supabase' ? 'The same list is emailed to each controller every morning.' : ''}</div>
+    <div class="row" style="margin-bottom:14px">${Object.entries(REASONS).map(([p, l]) => `<span class="why p${p}">${l}: ${list.filter(r => r._rem.p == p).length}</span>`).join('')}</div>
+    ${list.length ? Object.entries(groups).map(([g, items]) => `
+      <div class="card" style="margin-bottom:16px">
+        ${isCC ? '' : `<div class="card-h"><h3>${esc(g)}</h3><span class="muted small">${items.length} item(s)</span></div>`}
+        ${items.map(r => `<div class="rem">
+          <span class="why p${r._rem.p}">${r._rem.reason}</span>
+          <div><h4>${esc(r.reinsurer)} · ${esc(r.claim_number)} <span class="muted small">${r.ref}</span></h4>
+            <div class="muted small">${esc(r.client_name)}${r.payee ? ' · payee ' + esc(r.payee) : ''} · ${agingChip(r._days)} · outstanding <b style="color:var(--ink)">${r.currency} ${fmt(r._out)}</b>${r._rem.detail ? ' · ' + esc(r._rem.detail) : ''}</div>
+            ${r._lastComment ? `<div class="small" style="margin-top:3px">“${esc(r._lastComment)}”</div>` : ''}</div>
+          <div class="acts">
+            ${r._rem.p === 1 && can.edit() ? `<button class="btn sm" data-assign="${r.id}">Assign</button>` : ''}
+            ${can.followup() ? `<button class="btn sm" data-fu="${r.id}">Log follow-up</button>` : ''}
+            ${can.receipt() ? `<button class="btn sm primary" data-rcpt="${r.id}">Record recovery</button>` : ''}
+            <button class="btn sm" data-open="${r.id}">Open</button></div></div>`).join('')}
+      </div>`).join('') : `<div class="card"><div class="empty">🎉 Nothing needs follow-up right now.</div></div>`}`;
+  bindRowActions();
+}
+function bindRowActions(root = $('#view')) {
+  $$('[data-fu]', root).forEach(b => b.onclick = () => modalFollowUp(b.dataset.fu));
+  $$('[data-rcpt]', root).forEach(b => b.onclick = () => modalReceipt(b.dataset.rcpt));
+  $$('[data-assign]', root).forEach(b => b.onclick = () => modalAssign(b.dataset.assign));
+  $$('[data-open]', root).forEach(b => b.onclick = e => { if (e.target.closest('button,a') && e.target.closest('button,a') !== b) return; openDrawer(b.dataset.open); });
+}
+
+/* ---------------------------------------------------------------------
+   REGISTER (open & partially recovered)
+   --------------------------------------------------------------------- */
+const COLS = [
+  {k: 'ref', l: 'Ref'}, {k: 'date_sent', l: 'Sent to finance'}, {k: '_days', l: 'Age', num: 1}, {k: 'client_name', l: 'Client'},
+  {k: 'claim_number', l: 'Claim no.'}, {k: 'payee', l: 'Payee'}, {k: 'reinsurer', l: 'Reinsurer'}, {k: 'responsible', l: 'Responsible'},
+  {k: 'recovery_amount', l: 'Recovery amt', num: 1}, {k: '_rec', l: 'Recovered', num: 1}, {k: '_pct', l: '%', num: 1}, {k: '_out', l: 'Outstanding', num: 1},
+  {k: 'next_follow_up', l: 'Next follow-up'}, {k: '_lastComment', l: 'Latest comment'}
+];
+function filtered(list, f) {
+  const q = (f.q || '').toLowerCase().trim();
+  return list.filter(r => {
+    if (f.reinsurer && r.reinsurer !== f.reinsurer) return false;
+    if (f.controller === '__none' ? r.responsible : (f.controller && r.responsible !== f.controller)) return false;
+    if (f.aging !== '' && f.aging != null && agingIndex(r._days ?? 0) !== +f.aging) return false;
+    if (q && ![r.ref, r.claim_number, r.client_name, r.payee, r.reinsurer, r.linear_id, r.responsible].some(v => String(v || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function viewRegister() {
+  const f = S.f; if (f.mine == null) f.mine = role() === 'credit_control';
+  let list = S.recoveries.filter(r => r.currency === S.ccy && !r._closed);
+  if (f.status === 'open') list = list.filter(r => r.status === 'open'); else if (f.status === 'partial') list = list.filter(r => r.status === 'partial'); else if (f.status === 'attn') list = list.filter(r => r._rem);
+  if (f.mine && S.me.controller_name && !f.q) list = list.filter(r => r.responsible === S.me.controller_name);
+  list = filtered(list, f).sort(by(S.sort.key, S.sort.dir));
+  const tot = k => list.reduce((s, r) => s + (+r[k] || 0), 0);
+  const ris = [...new Set(S.recoveries.filter(r => r.currency === S.ccy && !r._closed).map(r => r.reinsurer))].sort();
+  $('#view').innerHTML = `
+    <div class="toolbar">
+      <select id="fStatus"><option value="active">Open + partial</option><option value="open">Open (nothing recovered)</option><option value="partial">Partially recovered</option><option value="attn">Needs follow-up</option></select>
+      <select id="fRi"><option value="">All reinsurers</option>${ris.map(x => `<option>${esc(x)}</option>`).join('')}</select>
+      <select id="fCtl"><option value="">All controllers</option><option value="__none">— Unassigned —</option>${controllers().map(x => `<option>${esc(x)}</option>`).join('')}</select>
+      <select id="fAge"><option value="">Any age</option>${AGING.map((a, i) => `<option value="${i}">${a[1]}</option>`).join('')}</select>
+      ${S.me.controller_name ? `<label class="chk"><input type="checkbox" id="fMine" ${f.mine ? 'checked' : ''}> My items only</label>` : ''}
+      <span class="spacer"></span>
+      <span class="muted small">${list.length} item(s)</span>
+      <button class="btn" id="xls">${icon('dl')} Export</button>
+      ${can.create() ? `<button class="btn primary" data-go3="new">${icon('plus')} Upload claims</button>` : ''}
+    </div>
+    <div class="card"><div class="tbl-wrap"><table class="t">
+      <thead><tr>${COLS.map(c => `<th class="sortable ${c.num ? 'num' : ''}" data-sort="${c.k}">${c.l}${S.sort.key === c.k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+      <tbody>${list.slice(0, 1500).map(r => `<tr class="click" data-open="${r.id}">
+        <td class="ref"><b>${r.ref}</b>${r._rem ? `<div><span class="why mini p${r._rem.p}">${r._rem.reason}</span></div>` : ''}</td>
+        <td>${fdate(r.date_sent)}</td><td class="num">${agingChip(r._days)}</td><td class="wrap">${esc(r.client_name)}</td>
+        <td style="white-space:nowrap">${esc(r.claim_number)}</td><td class="clip" title="${esc(r.payee)}">${esc(r.payee)}</td><td>${esc(r.reinsurer)}</td>
+        <td>${r.responsible ? esc(r.responsible) : '<span class="pill grey">Unassigned</span>'}</td>
+        <td class="num">${fmt(r.recovery_amount)}</td><td class="num">${fmt(r._rec)}${r._pending ? `<div class="small" style="color:var(--warn)">${fmt(r._pending)} unverified</div>` : ''}</td>
+        <td class="num"><div class="prog" title="${pct(r._pct)}"><i style="width:${Math.min(100, r._pct * 100)}%"></i></div><span class="small muted">${pct(r._pct)}</span></td>
+        <td class="num"><b>${fmt(r._out)}</b></td>
+        <td>${r.next_follow_up ? `<span style="${r.next_follow_up <= todayISO() ? 'color:var(--bad);font-weight:600' : ''}">${fdate(r.next_follow_up)}</span>` : '<span class="muted">–</span>'}</td>
+        <td class="wrap small">${esc(r._lastComment).slice(0, 120)}${r._lastCommentAt ? `<div class="muted">${fdate(r._lastCommentAt)}</div>` : ''}</td></tr>`).join('') || `<tr><td colspan="${COLS.length}" class="empty">No recoveries match these filters.</td></tr>`}</tbody>
+      <tfoot><tr><td colspan="8">Totals (${S.ccy})</td><td class="num">${fmt(tot('recovery_amount'))}</td><td class="num">${fmt(tot('_rec'))}</td><td class="num">${pct(tot('recovery_amount') ? tot('_rec') / tot('recovery_amount') : 0)}</td><td class="num">${fmt(tot('_out'))}</td><td colspan="2"></td></tr></tfoot>
+    </table></div></div>`;
+  $('#fStatus').value = f.status; $('#fRi').value = f.reinsurer; $('#fCtl').value = f.controller; $('#fAge').value = f.aging;
+  $('#fStatus').onchange = e => { f.status = e.target.value; viewRegister(); };
+  $('#fRi').onchange = e => { f.reinsurer = e.target.value; viewRegister(); };
+  $('#fCtl').onchange = e => { f.controller = e.target.value; if (f.controller) f.mine = false; viewRegister(); };
+  $('#fAge').onchange = e => { f.aging = e.target.value; viewRegister(); };
+  if ($('#fMine')) $('#fMine').onchange = e => { f.mine = e.target.checked; viewRegister(); };
+  $$('[data-sort]').forEach(th => th.onclick = () => { const k = th.dataset.sort; S.sort = {key: k, dir: S.sort.key === k ? -S.sort.dir : 1}; viewRegister(); });
+  $$('[data-go3]').forEach(b => b.onclick = () => go(b.dataset.go3));
+  $('#xls').onclick = () => exportRegister(list, `Recoveries_${S.ccy}_${todayISO()}.xlsx`);
+  bindOpen();
+}
+
+/* ---------------------------------------------------------------------
+   ARCHIVE (100% recovered + written off) — kept forever, never deleted
+   --------------------------------------------------------------------- */
+function viewArchive() {
+  const f = S.af ||= {q: '', reinsurer: '', status: '', from: '', to: ''};
+  let list = S.recoveries.filter(r => r.currency === S.ccy && r._closed);
+  if (f.status) list = list.filter(r => r.status === f.status);
+  if (f.from) list = list.filter(r => String(r.closed_at).slice(0, 10) >= f.from);
+  if (f.to) list = list.filter(r => String(r.closed_at).slice(0, 10) <= f.to);
+  list = filtered(list, {...f, q: S.f.q || f.q, controller: '', aging: ''}).sort(by(S.archSort.key, S.archSort.dir));
+  const ris = [...new Set(S.recoveries.filter(r => r._closed).map(r => r.reinsurer))].sort();
+  $('#view').innerHTML = `
+    <div class="note good" style="margin-bottom:14px">Claims that are 100% recovered move here automatically — they leave the working register but are never deleted. Every receipt and proof of payment stays attached for audit.</div>
+    <div class="toolbar">
+      <select id="aSt"><option value="">Recovered + written off</option><option value="recovered">Fully recovered</option><option value="written_off">Written off</option></select>
+      <select id="aRi"><option value="">All reinsurers</option>${ris.map(x => `<option>${esc(x)}</option>`).join('')}</select>
+      <label class="small muted">Closed from <input type="date" id="aFrom" value="${f.from}" style="padding:6px;border:1px solid var(--line-strong);border-radius:8px"></label>
+      <label class="small muted">to <input type="date" id="aTo" value="${f.to}" style="padding:6px;border:1px solid var(--line-strong);border-radius:8px"></label>
+      <span class="spacer"></span><span class="muted small">${list.length} item(s)</span>
+      <button class="btn" id="xls">${icon('dl')} Export</button>
+    </div>
+    <div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>
+      <th>Ref</th><th>Status</th><th>Closed</th><th>Client</th><th>Claim no.</th><th>Reinsurer</th><th>Responsible</th><th class="num">Recovery amt</th><th class="num">Recovered</th><th class="num">Days to recover</th><th>POPs</th></tr></thead>
+      <tbody>${list.map(r => `<tr class="click" data-open="${r.id}"><td><b>${r.ref}</b></td><td><span class="pill ${r.status}">${r.status === 'recovered' ? 'Recovered' : 'Written off'}</span></td><td>${fdate(r.closed_at)}</td>
+        <td class="wrap">${esc(r.client_name)}</td><td>${esc(r.claim_number)}</td><td>${esc(r.reinsurer)}</td><td>${esc(r.responsible || '–')}</td>
+        <td class="num">${fmt(r.recovery_amount)}</td><td class="num">${fmt(r._rec)}</td><td class="num">${r.closed_at ? Math.max(0, Math.round((new Date(r.closed_at) - new Date(r.date_sent)) / 864e5)) : '–'}</td>
+        <td>${r._receipts.filter(c => c.pop_path).length ? `📎 ${r._receipts.filter(c => c.pop_path).length}` : '<span class="muted">–</span>'}</td></tr>`).join('') || '<tr><td colspan="11" class="empty">Nothing archived yet.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="7">Totals (${S.ccy})</td><td class="num">${fmt(list.reduce((s, r) => s + r.recovery_amount, 0))}</td><td class="num">${fmt(list.reduce((s, r) => s + r._rec, 0))}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
+  $('#aSt').value = f.status; $('#aRi').value = f.reinsurer;
+  $('#aSt').onchange = e => { f.status = e.target.value; viewArchive(); };
+  $('#aRi').onchange = e => { f.reinsurer = e.target.value; viewArchive(); };
+  $('#aFrom').onchange = e => { f.from = e.target.value; viewArchive(); };
+  $('#aTo').onchange = e => { f.to = e.target.value; viewArchive(); };
+  $('#xls').onclick = () => exportRegister(list, `Recovered_Archive_${S.ccy}_${todayISO()}.xlsx`, true);
+  bindOpen();
+}
+
+/* ---------------------------------------------------------------------
+   DETAIL DRAWER
+   --------------------------------------------------------------------- */
+function openDrawer(id) { S.drawerId = id; S.drawerTab = S.drawerTab || 'activity'; renderDrawer(); $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); }
+function closeDrawer() { S.drawerId = null; $('#drawer').classList.remove('on'); $('#scrim').classList.remove('on'); }
+$('#scrim').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#modal').classList.contains('on')) closeModal(); else closeDrawer(); } });
+
+function renderDrawer() {
+  const r = S.recoveries.find(x => x.id === S.drawerId); if (!r) return closeDrawer();
+  const tab = S.drawerTab;
+  const timeline = [
+    ...r._acts.map(a => ({at: a.created_at, ic: KIND_IC[a.kind] || '•', cls: a.kind === 'promise' ? 'promise' : '', html: `<b>${KINDS[a.kind] || a.kind}</b>${a.promise_date ? ` — to pay ${a.promise_amount ? r.currency + ' ' + fmt(a.promise_amount) + ' ' : ''}by ${fdate(a.promise_date)}` : ''}<div>${esc(a.note || '')}</div>`, by: a.created_by})),
+    ...r._receipts.map(c => ({at: c.created_at, ic: '$', cls: 'rcpt', html: `<b>Recovery recorded: ${r.currency} ${fmt(c.amount)}</b> <span class="pill ${c.status}">${c.status}</span><div class="small">${c.method}${c.bank ? ' · ' + esc(c.bank) : ''}${c.reference ? ' · ref ' + esc(c.reference) : ''} · received ${fdate(c.receipt_date)}</div>`, by: c.created_by})),
+    {at: r.created_at, ic: '+', cls: '', html: `<b>Uploaded</b> <span class="muted small">(${r.source === 'excel_migration' ? 'migrated from Excel tracker' : r.source === 'bulk' ? 'bulk upload' : 'manual entry'})</span>`, by: r.created_by}
+  ].sort(by('at', -1));
+  $('#drawer').innerHTML = `
+    <div class="dh"><div class="row"><div style="flex:1"><div class="muted small">${r.ref} · ${r.currency}</div><h2 style="margin:2px 0 0;font-size:19px">${esc(r.reinsurer)} — ${esc(r.claim_number)}</h2></div>
+      <span class="pill ${r.status}">${{open: 'Open', partial: 'Partially recovered', recovered: '100% recovered', written_off: 'Written off'}[r.status]}</span><button class="x" id="dClose">✕</button></div>
+      ${r._rem ? `<div class="note warn" style="margin-top:10px"><b>${r._rem.reason}</b>${r._rem.detail ? ' — ' + esc(r._rem.detail) : ''}</div>` : ''}
+      <div class="row" style="margin-top:12px">
+        ${!r._closed && can.receipt() ? `<button class="btn primary" data-rcpt="${r.id}">${icon('up')} Record recovery + POP</button>` : ''}
+        ${!r._closed && can.followup() ? `<button class="btn" data-fu="${r.id}">Log follow-up</button>` : ''}
+        ${!r._closed && can.edit() ? `<button class="btn" data-assign="${r.id}">Reassign</button><button class="btn" id="dEdit">Edit</button>` : ''}
+        ${!r._closed && can.writeoff() ? `<button class="btn danger" id="dWo">Write off</button>` : ''}
+        ${r.status === 'written_off' && can.admin() ? `<button class="btn" id="dReopen">Reopen</button>` : ''}
+      </div></div>
+    <div class="db">
+      <div class="card" style="padding:14px 16px">
+        <div class="row" style="justify-content:space-between"><div><div class="muted small">Recovered</div><div style="font-size:20px;font-weight:700">${r.currency} ${fmt(r._rec)} <span class="muted small" style="font-weight:500">of ${fmt(r.recovery_amount)}</span></div></div>
+          <div style="text-align:right"><div class="muted small">Outstanding</div><div style="font-size:20px;font-weight:700;color:${r._out > 0.005 ? 'var(--bad)' : 'var(--good)'}">${fmt(r._out)}</div></div></div>
+        <div class="prog" style="height:9px;margin-top:10px"><i style="width:${Math.min(100, r._pct * 100)}%"></i></div>
+        ${r._pending ? `<div class="small" style="color:var(--warn);margin-top:6px">${r.currency} ${fmt(r._pending)} recorded but POP not yet verified by finance</div>` : ''}
+      </div>
+      <div class="facts">
+        <div><span>Client</span><b>${esc(r.client_name)}</b></div><div><span>Payee</span><b>${esc(r.payee || '–')}</b></div><div><span>Linear ID</span><b>${esc(r.linear_id || '–')}</b></div>
+        <div><span>Sent to finance</span><b>${fdate(r.date_sent)}</b> ${agingChip(r._days)}</div><div><span>Responsible</span><b>${esc(r.responsible || 'Unassigned')}</b></div><div><span>Next follow-up</span><b>${fdate(r.next_follow_up)}</b></div>
+        <div><span>Original claim</span><b>${r.currency} ${fmt(r.claim_amount)}</b></div><div><span>RI share</span><b>${(r.ri_share * 100).toFixed(2).replace(/\.00$/, '')}%</b></div><div><span>Arrangement</span><b>${esc(r.arrangement || '–')}</b></div>
+        <div><span>Paid to client?</span><b>${esc(r.client_payment_status || '–')}</b></div><div><span>Uploaded by</span><b>${esc(profileName(r.created_by))}</b></div><div><span>Closed</span><b>${fdate(r.closed_at)}</b></div>
+        ${r.notes ? `<div style="grid-column:1/-1"><span>Notes</span><b style="font-weight:400">${esc(r.notes)}</b></div>` : ''}
+        ${r.write_off_reason ? `<div style="grid-column:1/-1"><span>Write-off reason</span><b style="font-weight:400">${esc(r.write_off_reason)}</b></div>` : ''}
+      </div>
+      <div class="tabs"><button data-tab="activity" class="${tab === 'activity' ? 'on' : ''}">Activity (${timeline.length})</button><button data-tab="receipts" class="${tab === 'receipts' ? 'on' : ''}">Receipts & POPs (${r._receipts.length})</button><button data-tab="history" class="${tab === 'history' ? 'on' : ''}">Change history</button></div>
+      <div id="dTab"></div>
+    </div>`;
+  const dt = $('#dTab');
+  if (tab === 'activity') dt.innerHTML = `<ul class="tl">${timeline.map(t => `<li><div class="ic ${t.cls}">${t.ic}</div><div>${t.html}<div class="meta">${esc(profileName(t.by))} · ${fdt(t.at)}</div></div></li>`).join('')}</ul>`;
+  if (tab === 'receipts') dt.innerHTML = r._receipts.length ? `<table class="t"><thead><tr><th>Received</th><th class="num">Amount</th><th>Method / bank</th><th>POP</th><th>Status</th>${can.verify() ? '<th></th>' : ''}</tr></thead><tbody>${[...r._receipts].reverse().map(c => `<tr>
+      <td>${fdate(c.receipt_date)}<div class="muted small">by ${esc(profileName(c.created_by))}</div></td><td class="num"><b>${fmt(c.amount)}</b></td>
+      <td>${esc(c.method)}${c.bank ? '<div class="small muted">' + esc(c.bank) + '</div>' : ''}${c.reference ? '<div class="small muted">Ref ' + esc(c.reference) + '</div>' : ''}</td>
+      <td>${c.pop_path ? `<button class="btn sm" data-pop="${esc(c.pop_path)}">📎 ${esc(c.pop_name || 'View')}</button>` : '<span class="muted small">none</span>'}</td>
+      <td><span class="pill ${c.status}">${c.status}</span>${c.verified_by ? `<div class="muted small">${esc(profileName(c.verified_by))}<br>${fdt(c.verified_at)}</div>` : ''}${c.verify_note ? `<div class="small">${esc(c.verify_note)}</div>` : ''}</td>
+      ${can.verify() ? `<td>${c.status === 'pending' ? `<button class="btn sm good" data-ver="${c.id}">Verify</button> <button class="btn sm danger" data-rej="${c.id}">Reject</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table>` : '<div class="empty">No recoveries recorded yet.</div>';
+  if (tab === 'history') { dt.innerHTML = '<div class="empty">Loading…</div>'; API.audit({recordIds: [r.id, ...r._receipts.map(c => c.id)], limit: 200}).then(a => { if (S.drawerTab === 'history' && S.drawerId === r.id) dt.innerHTML = auditList(a); }); }
+  $('#dClose').onclick = closeDrawer;
+  $$('[data-tab]', $('#drawer')).forEach(b => b.onclick = () => { S.drawerTab = b.dataset.tab; renderDrawer(); });
+  bindRowActions($('#drawer'));
+  bindPop($('#drawer'));
+  $$('[data-ver]', $('#drawer')).forEach(b => b.onclick = () => verifyReceipt(b.dataset.ver, true));
+  $$('[data-rej]', $('#drawer')).forEach(b => b.onclick = () => verifyReceipt(b.dataset.rej, false));
+  if ($('#dEdit')) $('#dEdit').onclick = () => modalEdit(r.id);
+  if ($('#dWo')) $('#dWo').onclick = () => modalWriteOff(r.id);
+  if ($('#dReopen')) $('#dReopen').onclick = async () => { await API.updateRecovery(r.id, {status: 'open', write_off_reason: null, closed_at: null}); await API.insertActivities([{recovery_id: r.id, kind: 'system', note: 'Reopened by ' + S.me.full_name}]); toast('Recovery reopened', 'good'); reload(true); };
+}
+function bindPop(root) { $$('[data-pop]', root).forEach(b => b.onclick = async () => { try { const u = await API.popUrl(b.dataset.pop); if (!u) return toast('File not found', 'bad'); window.open(u, '_blank'); } catch (e) { toast(e.message, 'bad'); } }); }
+
+function auditList(a) {
+  if (!a.length) return '<div class="empty">No changes recorded.</div>';
+  const show = v => v == null ? '<span class="muted">empty</span>' : esc(typeof v === 'object' ? JSON.stringify(v) : v);
+  const label = k => ({recovered_to_date: 'Recovered to date', next_follow_up: 'Next follow-up', recovery_amount: 'Recovery amount', claim_amount: 'Claim amount', ri_share: 'RI share', client_name: 'Client', claim_number: 'Claim number', date_sent: 'Date sent'})[k] || k.replace(/_/g, ' ');
+  return `<ul class="tl">${a.map(x => `<li><div class="ic">${x.action === 'insert' ? '+' : x.action === 'delete' ? '−' : '✎'}</div><div>
+    <b>${x.action === 'insert' ? 'Created' : x.action === 'delete' ? 'Deleted' : 'Changed'}</b> <span class="muted small">${x.table_name}</span>
+    ${x.action === 'update' ? `<div class="small">${Object.entries(x.changed || {}).filter(([k]) => !['closed_at'].includes(k)).map(([k, v]) => `${label(k)}: ${show(v.from)} → <b>${show(v.to)}</b>`).join('<br>')}</div>` : ''}
+    <div class="meta">${esc(profileName(x.actor))} · ${fdt(x.at)}</div></div></li>`).join('')}</ul>`;
+}
+
+/* ---------------------------------------------------------------------
+   MODALS
+   --------------------------------------------------------------------- */
+function openModal({title, body, submit = 'Save', wide = false, onSubmit, onOpen, danger = false}) {
+  $('#modal').innerHTML = `<form class="modal ${wide ? 'wide' : ''}" id="mForm" novalidate><div class="mh"><h3>${title}</h3><button type="button" class="x" id="mX">✕</button></div>
+    <div class="mb">${body}</div><div class="mf"><button type="button" class="btn" id="mCancel">Cancel</button>${submit ? `<button class="btn ${danger ? 'danger' : 'primary'}" id="mGo">${submit}</button>` : ''}</div></form>`;
+  $('#modal').classList.add('on');
+  $('#mX').onclick = $('#mCancel').onclick = closeModal;
+  $('#mForm').onsubmit = async e => {
+    e.preventDefault(); const form = e.target;
+    const bad = [...form.elements].find(el => el.willValidate && !el.checkValidity()); if (bad) { bad.reportValidity(); return; }
+    const b = $('#mGo'); b.disabled = true; const t = b.textContent; b.textContent = 'Saving…';
+    try { const ok = await onSubmit(new FormData(form), form); if (ok !== false) closeModal(); }
+    catch (err) { console.error(err); toast(err.message || String(err), 'bad'); }
+    finally { if ($('#mGo')) { b.disabled = false; b.textContent = t; } }
+  };
+  onOpen && onOpen($('#mForm'));
+  setTimeout(() => $('#mForm input:not([type=hidden]),#mForm select')?.focus(), 30);
+}
+function closeModal() { $('#modal').classList.remove('on'); $('#modal').innerHTML = ''; }
+const opts = (arr, sel) => arr.map(x => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join('');
+
+function modalReceipt(id) {
+  const r = S.recoveries.find(x => x.id === id); const req = S.settings.require_pop !== false;
+  openModal({
+    title: `Record recovery — ${esc(r.reinsurer)} · ${esc(r.claim_number)}`,
+    submit: 'Save recovery',
+    body: `<div class="note" style="margin-bottom:14px">Outstanding: <b>${r.currency} ${fmt(r._out)}</b> of ${fmt(r.recovery_amount)}. Finance will verify the proof of payment before it is final.</div>
+    <div class="form">
+      <label>Amount recovered (${r.currency})<input name="amount" inputmode="decimal" required value="${r._out > 0 ? r._out.toFixed(2) : ''}"><span class="hint" id="amtHint"></span></label>
+      <label>Date received<input name="receipt_date" type="date" required value="${todayISO()}" max="${todayISO()}"></label>
+      <label>Method<select name="method">${opts(METHODS, 'Bank transfer')}</select></label>
+      <label>Bank deposited into<input name="bank" list="banks" placeholder="e.g. ZB Bank"><datalist id="banks">${BANKS.map(b => `<option>${b}`).join('')}</datalist></label>
+      <label class="full">Reference / narration<input name="reference" placeholder="Bank ref, offset statement no., etc."></label>
+      <label class="full">Proof of payment ${req ? '(required)' : '(optional)'}
+        <div class="drop" id="popDrop">📎 Click or drop the POP here — PDF, image, Excel or email (max 10 MB)<div id="popName" class="small" style="margin-top:6px;font-weight:600"></div></div>
+        <input type="file" name="pop" id="popFile" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xls,.csv,.doc,.docx,.msg,.eml" class="hidden"></label>
+      <label class="full">Comment<textarea name="note" placeholder="Optional — e.g. partial settlement, balance expected next week"></textarea></label>
+    </div>`,
+    onOpen: form => {
+      const drop = $('#popDrop'), inp = $('#popFile');
+      const show = () => { const f = inp.files[0]; $('#popName').textContent = f ? `${f.name} · ${(f.size / 1024).toFixed(0)} KB` : ''; };
+      drop.onclick = () => inp.click(); inp.onchange = show;
+      drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over');
+      drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files.length) { inp.files = e.dataTransfer.files; show(); } };
+      const hint = () => { const a = num(form.amount.value) || 0; $('#amtHint').innerHTML = a > r._out + 0.005 ? `<span style="color:var(--bad)">More than outstanding by ${fmt(a - r._out)}</span>` : Math.abs(a - r._out) < 0.005 ? '<span style="color:var(--good)">Clears the balance — this claim moves to the Recovered archive</span>' : `Balance after: ${fmt(r._out - a)}`; };
+      form.amount.oninput = hint; hint();
+    },
+    onSubmit: async (fd, form) => {
+      const amount = round2(num(fd.get('amount'))); const file = form.pop.files[0];
+      if (!amount || amount <= 0) { toast('Enter the amount recovered', 'bad'); return false; }
+      if (amount > r._out + 0.005 && !confirm(`This is ${fmt(amount - r._out)} more than the outstanding balance. Save anyway?`)) return false;
+      if (req && !file) { toast('Please attach the proof of payment', 'bad'); return false; }
+      if (file && file.size > 10 * 1024 * 1024) { toast('POP file is larger than 10 MB', 'bad'); return false; }
+      const pop = file ? await API.uploadPop(r.id, file) : {};
+      await API.insertReceipts([{recovery_id: r.id, amount, receipt_date: fd.get('receipt_date'), method: fd.get('method'), bank: fd.get('bank') || null, reference: fd.get('reference') || null, ...pop}]);
+      if (fd.get('note')) await API.insertActivities([{recovery_id: r.id, kind: 'note', note: fd.get('note')}]);
+      toast(amount >= r._out - 0.005 ? `Fully recovered — ${r.ref} moved to the archive` : `Recovery of ${r.currency} ${fmt(amount)} recorded`, 'good');
+      await reload(true);
+    }
+  });
+}
+
+function modalFollowUp(id) {
+  const r = S.recoveries.find(x => x.id === id);
+  openModal({
+    title: `Log follow-up — ${esc(r.reinsurer)} · ${esc(r.claim_number)}`,
+    body: `<div class="form">
+      <label>Type<select name="kind">${Object.entries(KINDS).filter(([k]) => !['system','reassign'].includes(k)).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+      <label>Next follow-up date<input name="next" type="date" value="${addDays(todayISO(), +S.settings.follow_up_days || 7)}" min="${todayISO()}"><span class="hint">You'll be reminded on this date</span></label>
+      <div class="full hidden" id="promiseBox"><div class="form"><label>Promised payment date<input name="promise_date" type="date"></label><label>Promised amount (${r.currency})<input name="promise_amount" inputmode="decimal" value="${r._out.toFixed(2)}"></label></div></div>
+      <label class="full">What happened?<textarea name="note" required placeholder="e.g. Spoke to Minerva — payment being processed, POP expected Friday"></textarea></label>
+    </div>`,
+    onOpen: form => { form.kind.onchange = () => { const p = form.kind.value === 'promise'; $('#promiseBox').classList.toggle('hidden', !p); form.promise_date.required = p; if (p && form.promise_date.value) form.next.value = form.promise_date.value; };
+      form.promise_date.onchange = () => { if (form.promise_date.value) form.next.value = addDays(form.promise_date.value, 1); }; },
+    onSubmit: async fd => {
+      const k = fd.get('kind');
+      await API.insertActivities([{recovery_id: r.id, kind: k, note: fd.get('note'), promise_date: k === 'promise' ? fd.get('promise_date') : null, promise_amount: k === 'promise' ? num(fd.get('promise_amount')) : null}]);
+      await API.updateRecovery(r.id, {next_follow_up: fd.get('next') || null});
+      toast('Follow-up logged', 'good'); await reload(true);
+    }
+  });
+}
+
+function modalAssign(id) {
+  const r = S.recoveries.find(x => x.id === id);
+  openModal({
+    title: `Assign credit controller — ${r.ref}`,
+    body: `<div class="form"><label class="full">Responsible<select name="who" required><option value="">Choose…</option>${opts(controllers(), r.responsible)}</select></label>
+      <label class="full"><span><input type="checkbox" name="def"> Also make this the default controller for <b>${esc(r.reinsurer)}</b> (new uploads auto-assign)</span></label></div>`,
+    onSubmit: async fd => {
+      const who = fd.get('who'); if (who === r.responsible) return;
+      await API.updateRecovery(r.id, {responsible: who});
+      await API.insertActivities([{recovery_id: r.id, kind: 'reassign', note: `Assigned to ${who}${r.responsible ? ' (was ' + r.responsible + ')' : ''}`}]);
+      if (fd.get('def')) { const ri = S.reinsurers.find(x => x.name === r.reinsurer); if (ri?.id) await API.updateReinsurer(ri.id, {default_controller: who}); }
+      toast('Assigned to ' + who, 'good'); await reload(true);
+    }
+  });
+}
+
+function modalWriteOff(id) {
+  const r = S.recoveries.find(x => x.id === id);
+  openModal({
+    title: `Write off ${r.ref}`, submit: 'Write off', danger: true,
+    body: `<div class="note warn" style="margin-bottom:12px">The unrecovered balance of <b>${r.currency} ${fmt(r._out)}</b> will be written off and the item moves to the archive. This is logged in the audit trail.</div>
+      <div class="form"><label class="full">Reason<textarea name="why" required placeholder="e.g. Reinsurer declined — outside treaty terms; approved by FM on …"></textarea></label></div>`,
+    onSubmit: async fd => { await API.updateRecovery(r.id, {status: 'written_off', write_off_reason: fd.get('why')}); await API.insertActivities([{recovery_id: r.id, kind: 'system', note: 'Written off: ' + fd.get('why')}]); toast('Written off', 'good'); closeDrawer(); await reload(true); }
+  });
+}
+
+function modalEdit(id) {
+  const r = S.recoveries.find(x => x.id === id);
+  openModal({
+    title: `Edit ${r.ref}`, wide: true,
+    body: claimFields(r) + `<div class="note warn small" style="margin-top:12px">Changes are recorded in the change history with your name.</div>`,
+    onOpen: form => wireClaimFields(form),
+    onSubmit: async fd => {
+      const p = readClaimFields(fd); if (!p) return false;
+      if (p.recovery_amount < r._rec - 0.005) { toast(`Recovery amount can't be less than what's already recovered (${fmt(r._rec)})`, 'bad'); return false; }
+      await API.addReinsurers([p.reinsurer]); await API.updateRecovery(r.id, p); toast('Saved', 'good'); await reload(true);
+    }
+  });
+}
+function claimFields(r = {}) {
+  return `<div class="form">
+    <label>Currency<select name="currency">${opts(['USD','ZWG'], r.currency || S.ccy)}</select></label>
+    <label>Date sent to finance<input name="date_sent" type="date" required value="${r.date_sent || todayISO()}"></label>
+    <label>Client name<input name="client_name" required value="${esc(r.client_name)}"></label>
+    <label>Claim number<input name="claim_number" required value="${esc(r.claim_number)}"></label>
+    <label>Payee<input name="payee" value="${esc(r.payee)}"></label>
+    <label>Linear ID<input name="linear_id" value="${esc(r.linear_id)}"></label>
+    <label>Reinsurer<input name="reinsurer" list="riList" required value="${esc(r.reinsurer)}"><datalist id="riList">${activeReinsurers().map(x => `<option>${esc(x)}`).join('')}</datalist></label>
+    <label>Arrangement<input name="arrangement" list="arrList" value="${esc(r.arrangement)}"><datalist id="arrList">${ARRANGEMENTS.map(x => `<option>${x}`).join('')}</datalist></label>
+    <label>Original claim amount<input name="claim_amount" inputmode="decimal" required value="${r.claim_amount ?? ''}"></label>
+    <label>Reinsurer share (%)<input name="ri_share" inputmode="decimal" required value="${r.ri_share != null ? round2(r.ri_share * 100 * 1e4) / 1e4 : 100}"></label>
+    <label>Recovery amount<input name="recovery_amount" inputmode="decimal" required value="${r.recovery_amount ?? ''}"><span class="hint">Auto = claim × share. Override only if the slip says otherwise.</span></label>
+    <label>Responsible (credit controller)<select name="responsible"><option value="">— Unassigned —</option>${opts(controllers(), r.responsible)}</select></label>
+    <label>Payment status to client<select name="client_payment_status">${opts(['Paid to client','Still to be paid to client'], r.client_payment_status || 'Paid to client')}</select></label>
+    <label class="full">Notes<textarea name="notes">${esc(r.notes)}</textarea></label></div>`;
+}
+function wireClaimFields(form) {
+  const calc = () => { const a = num(form.claim_amount.value), s = num(form.ri_share.value); if (a != null && s != null) form.recovery_amount.value = round2(a * s / 100).toFixed(2); };
+  form.claim_amount.oninput = calc; form.ri_share.oninput = calc;
+  form.reinsurer.onchange = () => { const ri = S.reinsurers.find(x => x.name === form.reinsurer.value); if (ri?.default_controller && !form.responsible.value) form.responsible.value = ri.default_controller; };
+}
+function readClaimFields(fd) {
+  const share = num(fd.get('ri_share')), amt = num(fd.get('claim_amount')), rec = num(fd.get('recovery_amount'));
+  if (!(share > 0 && share <= 100)) { toast('Reinsurer share must be between 0 and 100%', 'bad'); return null; }
+  if (amt == null || amt < 0 || rec == null || rec < 0) { toast('Enter valid amounts', 'bad'); return null; }
+  return {currency: fd.get('currency'), date_sent: fd.get('date_sent'), client_name: fd.get('client_name').trim(), claim_number: fd.get('claim_number').trim(), payee: fd.get('payee').trim() || null,
+    linear_id: fd.get('linear_id').trim() || null, reinsurer: normalizeReinsurer(fd.get('reinsurer')).name, arrangement: fd.get('arrangement') || null, claim_amount: round2(amt), ri_share: share / 100,
+    recovery_amount: round2(rec), responsible: fd.get('responsible') || null, client_payment_status: fd.get('client_payment_status'), notes: fd.get('notes') || null};
+}
+
+/* ---------------------------------------------------------------------
+   UPLOAD CLAIMS (single entry with several reinsurers, or Excel upload)
+   --------------------------------------------------------------------- */
+function viewNew() {
+  const tab = S.newTab ||= 'single';
+  $('#view').innerHTML = `
+    <div class="tabs" style="margin-top:0"><button data-nt="single" class="${tab === 'single' ? 'on' : ''}">Single claim</button><button data-nt="bulk" class="${tab === 'bulk' ? 'on' : ''}">Upload from Excel</button></div>
+    <div id="ntBody"></div>`;
+  $$('[data-nt]').forEach(b => b.onclick = () => { S.newTab = b.dataset.nt; viewNew(); });
+  tab === 'single' ? newSingle() : newBulk();
+}
+function newSingle() {
+  const ris = activeReinsurers();
+  $('#ntBody').innerHTML = `<form class="card" id="nsForm" novalidate><div class="card-b">
+    <div class="note" style="margin-bottom:16px">Capture the claim payment once, then add a line for each reinsurer on the risk. Each line becomes its own recovery so credit control can chase every reinsurer separately.</div>
+    <div class="form">
+      <label>Currency<select name="currency">${opts(['USD','ZWG'], S.ccy)}</select></label>
+      <label>Date sent to finance<input name="date_sent" type="date" required value="${todayISO()}" max="${todayISO()}"></label>
+      <label>Client name<input name="client_name" required></label>
+      <label>Claim number<input name="claim_number" required placeholder="e.g. T1/FLT/USC/021310"></label>
+      <label>Payee<input name="payee"></label>
+      <label>Linear ID<input name="linear_id"></label>
+      <label>Original claim amount paid<input name="claim_amount" inputmode="decimal" required></label>
+      <label>Payment status to client<select name="client_payment_status">${opts(['Paid to client','Still to be paid to client'])}</select></label>
+      <label class="full">Notes<input name="notes" placeholder="Optional"></label>
+    </div>
+    <h4 style="margin:22px 0 8px">Reinsurers on this claim</h4>
+    <table class="t" id="lines"><thead><tr><th>Reinsurer</th><th>Arrangement</th><th>Share %</th><th class="num">Recovery amount</th><th>Credit controller</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row" style="margin-top:10px"><button type="button" class="btn sm" id="addLine">${icon('plus')} Add reinsurer</button><span class="spacer"></span><span class="muted small" id="lineTot"></span></div>
+    <datalist id="riList2">${ris.map(x => `<option>${esc(x)}`).join('')}</datalist><datalist id="arrList2">${ARRANGEMENTS.map(x => `<option>${x}`).join('')}</datalist>
+    <div id="dupWarn" style="margin-top:12px"></div>
+  </div><div class="mf" style="border-radius:0 0 10px 10px"><button type="reset" class="btn">Clear</button><button class="btn primary">Save & notify controllers</button></div></form>`;
+  const form = $('#nsForm'), tb = $('#lines tbody');
+  const ctlOpts = sel => `<option value="">— Unassigned —</option>${opts(controllers(), sel)}`;
+  const addLine = () => { const tr = document.createElement('tr'); tr.innerHTML = `<td><input class="li-ri" list="riList2" required style="width:100%;padding:6px 8px;border:1px solid var(--line-strong);border-radius:7px"></td>
+      <td><input class="li-arr" list="arrList2" style="width:100%;padding:6px 8px;border:1px solid var(--line-strong);border-radius:7px"></td>
+      <td><input class="li-sh" inputmode="decimal" value="100" style="width:80px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:7px"></td>
+      <td class="num li-amt">–</td><td><select class="li-ctl" style="padding:6px 8px;border:1px solid var(--line-strong);border-radius:7px">${ctlOpts()}</select></td>
+      <td><button type="button" class="x li-del" title="Remove">✕</button></td>`; tb.appendChild(tr);
+    tr.querySelector('.li-del').onclick = () => { tr.remove(); calc(); };
+    tr.querySelector('.li-ri').onchange = e => { const ri = S.reinsurers.find(x => x.name.toLowerCase() === normalizeReinsurer(e.target.value).name.toLowerCase()); if (ri?.default_controller && !tr.querySelector('.li-ctl').value) tr.querySelector('.li-ctl').value = ri.default_controller; checkDup(); };
+    tr.querySelector('.li-sh').oninput = calc; calc(); };
+  const calc = () => { const amt = num(form.claim_amount.value) || 0; let tot = 0, sh = 0;
+    $$('tr', tb).forEach(tr => { const s = num(tr.querySelector('.li-sh').value) || 0; sh += s; const v = round2(amt * s / 100); tot += v; tr.querySelector('.li-amt').textContent = fmt(v); });
+    $('#lineTot').innerHTML = `Total recoverable: <b>${form.currency.value} ${fmt(tot)}</b> (${fmt(sh, 2)}% of claim)${sh > 100.0001 ? ' <span style="color:var(--bad)">— shares exceed 100%</span>' : ''}`; };
+  const checkDup = () => { const cn = form.claim_number.value.trim().toLowerCase(); if (!cn) { $('#dupWarn').innerHTML = ''; return; }
+    const hits = S.recoveries.filter(r => r.claim_number.trim().toLowerCase() === cn);
+    $('#dupWarn').innerHTML = hits.length ? `<div class="note warn">This claim number already has ${hits.length} recovery line(s): ${hits.slice(0, 5).map(r => `${r.ref} (${esc(r.reinsurer)}, ${esc(r.payee || '')}, ${r.currency} ${fmt(r.recovery_amount)}, ${r.status})`).join('; ')}. Check you're not uploading the same payment twice.</div>` : ''; };
+  $('#addLine').onclick = addLine; addLine();
+  form.claim_amount.oninput = calc; form.currency.onchange = calc; form.claim_number.onchange = checkDup;
+  form.onreset = () => setTimeout(() => { tb.innerHTML = ''; addLine(); $('#dupWarn').innerHTML = ''; });
+  form.onsubmit = async e => {
+    e.preventDefault(); const bad = [...form.elements].find(el => el.willValidate && !el.checkValidity()); if (bad) return bad.reportValidity();
+    const fd = new FormData(form); const amt = num(fd.get('claim_amount'));
+    if (!(amt > 0)) return toast('Enter the claim amount paid', 'bad');
+    const lines = $$('tr', tb).map(tr => ({ri: normalizeReinsurer(tr.querySelector('.li-ri').value), arr: tr.querySelector('.li-arr').value, sh: num(tr.querySelector('.li-sh').value), ctl: tr.querySelector('.li-ctl').value}));
+    if (!lines.length) return toast('Add at least one reinsurer', 'bad');
+    if (lines.some(l => !(l.sh > 0 && l.sh <= 100))) return toast('Each share must be between 0 and 100%', 'bad');
+    if (lines.reduce((s, l) => s + l.sh, 0) > 100.0001) return toast('Shares add up to more than 100%', 'bad');
+    const base = {currency: fd.get('currency'), date_sent: fd.get('date_sent'), client_name: fd.get('client_name').trim(), claim_number: fd.get('claim_number').trim(), payee: fd.get('payee').trim() || null,
+      linear_id: fd.get('linear_id').trim() || null, claim_amount: round2(amt), client_payment_status: fd.get('client_payment_status'), notes: fd.get('notes') || null, source: 'manual'};
+    const rows = lines.map(l => ({...base, reinsurer: l.ri.name, arrangement: l.arr || l.ri.arrangement || null, ri_share: l.sh / 100, recovery_amount: round2(amt * l.sh / 100),
+      responsible: l.ctl || S.reinsurers.find(x => x.name === l.ri.name)?.default_controller || null}));
+    try {
+      await API.addReinsurers(rows.map(r => r.reinsurer));
+      const ins = await API.insertRecoveries(rows);
+      toast(`Saved ${ins.length} recovery line(s): ${ins.map(r => r.ref).join(', ')}. Controllers will see them in Reminders.`, 'good');
+      form.reset(); await reload(true);
+    } catch (err) { toast(err.message || String(err), 'bad'); }
+  };
+}
+
+/* ---- reinsurer name clean-up (handles the variants found in the old tracker) ---- */
+const RI_PATTERNS = [[/minerva/i, 'Minerva Re'], [/emeritus/i, 'Emeritus Re'], [/bright\s*re/i, 'Bright Re'], [/\bafc\b/i, 'AFC'], [/capit[ao]l/i, 'Capital Re'],
+  [/\bzb\s*re/i, 'ZB Re'], [/grand\s*re/i, 'Grand Re'], [/\bfbc\b/i, 'FBC Re'], [/first\s*mutual|\bfmre\b/i, 'First Mutual Re'], [/\bicz\b/i, 'ICZ'], [/\bcbz\b/i, 'CBZ'],
+  [/skybridge/i, 'Skybridge Re'], [/waica/i, 'WAICA Re']];
+const ARR_WORDS = /retained|surplus|treaty|quota|facultative|\bxol\b/i;
+function normalizeReinsurer(raw) {
+  const s = String(raw || '').trim(); if (!s) return {name: 'Unspecified'};
+  const exact = S.reinsurers.find(r => r.name.toLowerCase() === s.toLowerCase()); if (exact) return {name: exact.name};
+  const hits = []; RI_PATTERNS.forEach(([re, n]) => { if (re.test(s) && !hits.includes(n)) hits.push(n); });
+  const share = (s.match(/(\d{1,3}(?:\.\d+)?)\s*%?\s*$/) || s.match(/^(\d{1,3})\s*%/) || [])[1];
+  const arr = /\bxol\b/i.test(s) ? 'XOL' : null;
+  if (hits.length === 1) return {name: hits[0], arrangement: arr, shareNote: share ? share + '%' : null};
+  if (hits.length > 1) return {name: hits.join(' / '), multi: true, arrangement: arr};
+  if (ARR_WORDS.test(s)) return {name: 'Unspecified', arrangement: s};
+  return {name: s.replace(/\s+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\bRe\b/i, 'Re')};
+}
+
+/* ---- Excel parsing: works for the template AND the legacy tracker layout ---- */
+const HDR = {
+  date_sent: ['datesenttofinance','datereceived','datesent','date'], linear_id: ['linearid'], client_name: ['clientname','client','insured'],
+  claim_number: ['claimnumber','claimno','claim'], payee: ['payee'], reinsurer: ['reinsurer','reinsurers'], arrangement: ['arrangement','ritype','reinsurancetype'],
+  responsible: ['responsible','creditcontroller','controller'], claim_amount: ['originalclaimamount','claimamount','originalclaim'],
+  ri_share: ['reparticipantratio','rishare','share','reinsurershare','participationratio'], recovery_amount: ['recoveryamtus','recoveryamount','recoveryamt','recoveryamountzwg','recoveryamountusd'],
+  recovered: ['recoveredtodate'], bank_date: ['bankdepositdate'], bank: ['banktherecoverywasdeposited','bank'], client_payment_status: ['paymentstatustoclient'],
+  comment_date: ['commentdate'], comment: ['recoverycomments','comments','comment'], currency: ['currency','ccy'], notes: ['notes']
+};
+const normH = h => String(h || '').toLowerCase().replace(/[^a-z]/g, '');
+function excelDate(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return isoOf(v);
+  if (typeof v === 'number') { if (v < 20000 || v > 80000) return null; const d = XLSX.SSF.parse_date_code(v); return d ? `${d.y}-${pad(d.m)}-${pad(d.d)}` : null; }
+  const s = String(v).trim(); let m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; const mo = +m[2], d = +m[1]; if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${pad(mo)}-${pad(d)}`; }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+function parseWorkbook(wb, defaultCcy) {
+  const out = {rows: [], issues: [], sheets: []};
+  for (const name of wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: true, defval: null});
+    const hi = aoa.findIndex(r => r && r.filter(Boolean).map(normH).some(h => ['claimnumber','claimno'].includes(h)));
+    if (hi < 0) continue;
+    const head = aoa[hi].map(normH); const col = {};
+    for (const [k, alts] of Object.entries(HDR)) { let i = head.findIndex(h => alts.includes(h)); if (i < 0) i = head.findIndex(h => alts.some(a => a.length > 6 && h.startsWith(a))); if (i >= 0) col[k] = i; }
+    const ccy = /zwg|zig|zwl/i.test(name) ? 'ZWG' : /usd/i.test(name) ? 'USD' : defaultCcy;
+    let n = 0;
+    aoa.slice(hi + 1).forEach((r, i) => {
+      if (!r || !r.some(v => v != null && v !== '')) return;
+      const g = k => col[k] != null ? r[col[k]] : null;
+      const claim = String(g('claim_number') ?? '').trim(), client = String(g('client_name') ?? '').trim();
+      if (!claim && !client) return;
+      if (String(g('responsible') || '').trim().toLowerCase() === 'total') return;
+      const rowNo = hi + i + 2, issues = [];
+      let claimAmt = num(g('claim_amount')), share = num(g('ri_share')), recAmt = num(g('recovery_amount'));
+      if (share != null && share > 1) share = share / 100;
+      if (share == null || share <= 0) share = (claimAmt && recAmt) ? Math.min(1, recAmt / claimAmt) : 1;
+      if (recAmt == null && claimAmt != null) recAmt = claimAmt * share;
+      if (claimAmt == null && recAmt != null) claimAmt = recAmt / share;
+      if (recAmt == null) { out.issues.push(`${name} row ${rowNo}: no amount — skipped`); return; }
+      const ri = normalizeReinsurer(g('reinsurer'));
+      let date = excelDate(g('date_sent')); if (!date) { issues.push('no valid date sent – used today'); date = todayISO(); }
+      if (!claim) issues.push('no claim number');
+      if (ri.multi) issues.push(`several reinsurers on one line (${ri.name}) — consider splitting`);
+      if (ri.name === 'Unspecified') issues.push('reinsurer not specified');
+      const rowCcy = (String(g('currency') || '').toUpperCase().match(/USD|ZWG/) || [ccy])[0];
+      const notes = [g('notes'), ri.shareNote ? `Reinsurer cell said “${g('reinsurer')}”` : null].filter(Boolean).join(' · ') || null;
+      out.rows.push({sheet: name, rowNo, issues,
+        rec: {currency: rowCcy, date_sent: date, linear_id: g('linear_id') != null ? String(g('linear_id')) : null, client_name: client || '(not given)', claim_number: claim || '(not given)',
+          payee: g('payee') ? String(g('payee')).trim() : null, reinsurer: ri.name, arrangement: g('arrangement') || ri.arrangement || null,
+          responsible: g('responsible') ? String(g('responsible')).trim() : null, claim_amount: round2(claimAmt), ri_share: Math.round(share * 1e6) / 1e6, recovery_amount: round2(recAmt),
+          client_payment_status: g('client_payment_status') ? String(g('client_payment_status')).trim().replace(/^paid to client$/i, 'Paid to client').replace(/^paid$/i, 'Paid to client') : null, notes},
+        recovered: num(g('recovered')) || 0, bank: g('bank') ? String(g('bank')).trim() : null, bank_date: excelDate(g('bank_date')),
+        comment: g('comment') ? String(g('comment')).trim() : null, comment_date: excelDate(g('comment_date'))});
+      n++;
+    });
+    out.sheets.push({name, ccy, n, cols: Object.keys(col)});
+  }
+  return out;
+}
+
+function newBulk() {
+  $('#ntBody').innerHTML = `<div class="card"><div class="card-b">
+    <div class="grid g2">
+      <div><h4 style="margin-top:0">1. Get the template</h4><p class="muted">One row per claim payment per reinsurer. Columns: Currency, Date sent to finance, Linear ID, Client, Claim number, Payee, Reinsurer, Arrangement, Responsible, Original claim amount, Reinsurer share %, Notes.</p>
+        <button class="btn" id="tpl">${icon('dl')} Download Excel template</button></div>
+      <div><h4 style="margin-top:0">2. Upload the filled file</h4><p class="muted">You can also upload the old recoveries tracker (USD and ZWG sheets) — the columns are recognised automatically.</p>
+        <div class="drop" id="bDrop">📄 Click or drop an .xlsx file here</div><input type="file" id="bFile" accept=".xlsx,.xls,.xlsm,.csv" class="hidden"></div>
+    </div>
+    <div id="bPrev" style="margin-top:18px"></div></div></div>`;
+  $('#tpl').onclick = downloadTemplate;
+  const drop = $('#bDrop'), inp = $('#bFile');
+  drop.onclick = () => inp.click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) handleBulk(e.dataTransfer.files[0]); };
+  inp.onchange = () => inp.files[0] && handleBulk(inp.files[0]);
+}
+function downloadTemplate() {
+  const wb = XLSX.utils.book_new();
+  const head = ['Currency','Date Sent to Finance','Linear ID','Client Name','Claim Number','Payee','Reinsurer','Arrangement','Responsible','Original Claim Amount','Reinsurer Share %','Notes'];
+  const ws = XLSX.utils.aoa_to_sheet([head, ['USD', todayISO(), '', 'Example Client Ltd', 'T1/FLT/USC/000000', 'Example Panelbeaters', activeReinsurers()[0] || 'Minerva Re', 'Facultative', controllers()[0] || '', 1000, 100, 'Delete this example row']]);
+  ws['!cols'] = head.map(h => ({wch: Math.max(14, h.length + 2)}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Claims');
+  const n = Math.max(activeReinsurers().length, controllers().length);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Reinsurers','Credit controllers','Arrangements'], ...Array.from({length: Math.max(n, ARRANGEMENTS.length)}, (_, i) => [activeReinsurers()[i] || '', controllers()[i] || '', ARRANGEMENTS[i] || ''])]), 'Lists');
+  XLSX.writeFile(wb, 'Recoveries_upload_template.xlsx');
+}
+async function handleBulk(file) {
+  const box = $('#bPrev'); box.innerHTML = '<div class="empty">Reading file…</div>';
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), {type: 'array', cellDates: false});
+    const p = parseWorkbook(wb, S.ccy);
+    if (!p.rows.length) { box.innerHTML = `<div class="note bad">No claim rows found. Make sure there is a header row with a “Claim Number” column.</div>`; return; }
+    const isLegacy = p.rows.some(r => r.recovered > 0 || r.comment);
+    // duplicates against existing data
+    const key = r => [r.currency, r.claim_number, r.payee, r.reinsurer, round2(r.recovery_amount)].join('|').toLowerCase();
+    const have = new Set(S.recoveries.map(key));
+    p.rows.forEach(r => { r.dup = have.has(key(r.rec)); });
+    const fresh = p.rows.filter(r => !r.dup);
+    const newRi = [...new Set(fresh.map(r => r.rec.reinsurer))].filter(n => !S.reinsurers.some(x => x.name.toLowerCase() === n.toLowerCase()));
+    const unassigned = fresh.filter(r => !r.rec.responsible).length;
+    // each reinsurer's usual controller: existing default, else most common in this file
+    const learned = {}; const tally = {};
+    fresh.forEach(r => { if (r.rec.responsible) { const t = (tally[r.rec.reinsurer] ||= {}); t[r.rec.responsible] = (t[r.rec.responsible] || 0) + 1; } });
+    Object.entries(tally).forEach(([k, t]) => learned[k] = Object.entries(t).sort((a, b) => b[1] - a[1])[0][0]);
+    S.reinsurers.forEach(x => { if (x.default_controller) learned[x.name] = x.default_controller; });
+    const autoN = fresh.filter(r => !r.rec.responsible && learned[r.rec.reinsurer]).length;
+    const fullyDone = fresh.filter(r => r.recovered >= r.rec.recovery_amount - 0.005 && r.rec.recovery_amount > 0).length;
+    const tot = c => fresh.filter(r => r.rec.currency === c).reduce((s, r) => s + r.rec.recovery_amount, 0);
+    box.innerHTML = `
+      <div class="note ${fresh.length ? 'good' : 'warn'}"><b>${fresh.length}</b> new recovery line(s) ready from ${p.sheets.map(s => `${esc(s.name)} (${s.n})`).join(', ')}.
+        USD ${fmt(tot('USD'))} · ZWG ${fmt(tot('ZWG'))}. ${p.rows.length - fresh.length ? `<b>${p.rows.length - fresh.length}</b> already in the system — will be skipped.` : ''}</div>
+      ${newRi.length ? `<div class="note" style="margin-top:8px">New reinsurer names that will be created: ${newRi.map(esc).join(', ')}. You can rename or merge them later in Settings.</div>` : ''}
+      ${unassigned ? `<div class="note warn" style="margin-top:8px">${unassigned} line(s) have no responsible controller.
+        ${autoN ? `<label class="chk" style="display:flex;margin-top:6px"><input type="checkbox" id="autoAs" checked> <span>Auto-assign ${autoN} of them to the controller who usually handles that reinsurer (${Object.entries(learned).slice(0, 6).map(([k, v]) => esc(k) + ' → ' + esc(v)).join(', ')}${Object.keys(learned).length > 6 ? ', …' : ''}).</span></label>` : ''}
+        ${unassigned - autoN ? `<div style="margin-top:4px">${unassigned - autoN} will show as <b>Unassigned</b> in Reminders until someone assigns them.</div>` : ''}</div>` : ''}
+      ${isLegacy && can.admin() ? `<label class="chk" style="margin-top:12px;display:flex"><input type="checkbox" id="mig" checked> <span><b>Migration mode</b> — bring in “Recovered To Date” as opening receipts (marked <i>Migrated</i>, verified) and the comments as activity history. ${fullyDone} line(s) are already 100% recovered and will go straight to the archive.</span></label>` : ''}
+      ${isLegacy && !can.admin() ? `<div class="note warn" style="margin-top:8px">This file has recovered amounts/comments. Only an admin can migrate those — you'll upload the claims only.</div>` : ''}
+      <div class="tbl-wrap" style="margin-top:12px;max-height:420px;border:1px solid var(--line);border-radius:8px"><table class="t"><thead><tr><th>Sheet/row</th><th>Ccy</th><th>Date sent</th><th>Client</th><th>Claim no.</th><th>Reinsurer</th><th>Responsible</th><th class="num">Recovery amt</th><th class="num">Recovered</th><th>Check</th></tr></thead>
+        <tbody>${p.rows.slice(0, 600).map(r => `<tr style="${r.dup ? 'opacity:.45' : ''}"><td class="muted small">${esc(r.sheet)} ${r.rowNo}</td><td>${r.rec.currency}</td><td>${fdate(r.rec.date_sent)}</td><td class="clip">${esc(r.rec.client_name)}</td><td>${esc(r.rec.claim_number)}</td><td>${esc(r.rec.reinsurer)}</td><td>${esc(r.rec.responsible || '–')}</td>
+          <td class="num">${fmt(r.rec.recovery_amount)}</td><td class="num">${r.recovered ? fmt(r.recovered) : ''}</td><td class="small">${r.dup ? 'Duplicate – skip' : r.issues.length ? `<span style="color:var(--warn)">${esc(r.issues.join('; '))}</span>` : '<span style="color:var(--good)">OK</span>'}</td></tr>`).join('')}</tbody></table></div>
+      ${p.issues.length ? `<details style="margin-top:8px"><summary class="small muted">${p.issues.length} row(s) skipped</summary><div class="small">${p.issues.map(esc).join('<br>')}</div></details>` : ''}
+      <div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn" id="bCancel">Cancel</button><button class="btn primary" id="bGo" ${fresh.length ? '' : 'disabled'}>Upload ${fresh.length} line(s)</button></div>`;
+    $('#bCancel').onclick = () => newBulk();
+    $('#bGo').onclick = async () => {
+      const b = $('#bGo'); b.disabled = true; b.textContent = 'Uploading…';
+      const migrate = !!$('#mig')?.checked, auto = !!$('#autoAs')?.checked;
+      try {
+        await API.addReinsurers(fresh.map(r => r.rec.reinsurer));
+        const rows = fresh.map(r => ({...r.rec, id: uid(), client_payment_status: r.rec.client_payment_status || 'Paid to client',
+          responsible: r.rec.responsible || (auto ? learned[r.rec.reinsurer] : null) || null, source: migrate ? 'excel_migration' : 'bulk'}));
+        const ins = await API.insertRecoveries(rows);
+        // learn each reinsurer's usual controller so future uploads auto-assign
+        const tally = {}; fresh.forEach(r => { if (r.rec.responsible) { const t = (tally[r.rec.reinsurer] ||= {}); t[r.rec.responsible] = (t[r.rec.responsible] || 0) + 1; } });
+        for (const [riName, t] of Object.entries(tally)) {
+          const ri = S.reinsurers.find(x => x.name === riName);
+          const best = Object.entries(t).sort((a, b) => b[1] - a[1])[0][0];
+          if (!ri?.default_controller && can.admin()) await API.setDefaultController(riName, best).catch(() => {});
+        }
+        if (migrate) {
+          const rc = [], ac = [];
+          fresh.forEach((r, i) => { const id = rows[i].id;
+            if (r.recovered > 0) rc.push({recovery_id: id, amount: round2(r.recovered), receipt_date: r.bank_date || r.rec.date_sent, method: 'Migrated', bank: r.bank, reference: 'Opening balance migrated from Excel tracker', status: 'verified', verified_by: S.me.id, verified_at: new Date().toISOString(), verify_note: 'Migrated'});
+            if (r.comment) ac.push({recovery_id: id, kind: 'note', note: r.comment + (r.comment_date ? '' : ' (from Excel tracker)'), created_at: r.comment_date ? r.comment_date + 'T08:00:00Z' : new Date().toISOString()});
+          if (!r.rec.responsible && rows[i].responsible) ac.push({recovery_id: id, kind: 'system', note: `Auto-assigned to ${rows[i].responsible} (usual controller for ${r.rec.reinsurer}) during upload`}); });
+          if (rc.length) await API.insertReceipts(rc);
+          if (ac.length) await API.insertActivities(ac);
+        }
+        if (!migrate) { const aa = fresh.map((r, i) => (!r.rec.responsible && rows[i].responsible) ? {recovery_id: rows[i].id, kind: 'system', note: `Auto-assigned to ${rows[i].responsible} (usual controller for ${r.rec.reinsurer}) during upload`} : null).filter(Boolean); if (aa.length) await API.insertActivities(aa); }
+        toast(`Uploaded ${ins.length} recovery line(s)`, 'good');
+        await reload(true); go('register');
+      } catch (err) { console.error(err); toast(err.message || String(err), 'bad'); b.disabled = false; b.textContent = 'Retry upload'; }
+    };
+  } catch (e) { console.error(e); box.innerHTML = `<div class="note bad">Could not read this file: ${esc(e.message)}</div>`; }
+}
+
+/* ---------------------------------------------------------------------
+   POP VERIFICATION (finance)
+   --------------------------------------------------------------------- */
+function viewVerify() {
+  const pend = S.receipts.filter(c => c.status === 'pending').map(c => ({c, r: S.recoveries.find(r => r.id === c.recovery_id)})).filter(x => x.r).sort((a, b) => a.c.created_at.localeCompare(b.c.created_at));
+  const recent = S.receipts.filter(c => c.status !== 'pending' && c.method !== 'Migrated').sort(by('verified_at', -1)).slice(0, 15).map(c => ({c, r: S.recoveries.find(r => r.id === c.recovery_id)})).filter(x => x.r);
+  $('#view').innerHTML = `
+    <div class="note" style="margin-bottom:14px">When credit control records a recovery it counts straight away, but stays <b>pending</b> until finance checks the POP against the bank statement. Rejecting a receipt reverses it and puts the claim back in the register.</div>
+    <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Awaiting verification</h3><span class="muted small">${pend.length}</span></div>
+      ${pend.length ? `<div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Recorded</th><th>Recovery</th><th class="num">Amount</th><th>Received / bank</th><th>POP</th><th></th></tr></thead><tbody>${pend.map(({c, r}) => `<tr>
+        <td>${fdt(c.created_at)}<div class="muted small">${esc(profileName(c.created_by))}</div></td>
+        <td><a href="#" data-open="${r.id}"><b>${r.ref}</b></a> · ${esc(r.reinsurer)}<div class="muted small">${esc(r.claim_number)} · ${esc(r.client_name)}</div></td>
+        <td class="num"><b>${r.currency} ${fmt(c.amount)}</b></td><td>${fdate(c.receipt_date)}<div class="muted small">${esc(c.method)}${c.bank ? ' · ' + esc(c.bank) : ''}${c.reference ? ' · ' + esc(c.reference) : ''}</div></td>
+        <td>${c.pop_path ? `<button class="btn sm" data-pop="${esc(c.pop_path)}">📎 ${esc((c.pop_name || 'View').slice(0, 28))}</button>` : '<span class="pill written_off">No POP</span>'}</td>
+        <td style="white-space:nowrap"><button class="btn sm good" data-ver="${c.id}">Verify</button> <button class="btn sm danger" data-rej="${c.id}">Reject</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">All caught up — no POPs waiting.</div>'}</div>
+    <div class="card"><div class="card-h"><h3>Recently verified / rejected</h3></div>
+      ${recent.length ? `<table class="t"><tbody>${recent.map(({c, r}) => `<tr class="click" data-open="${r.id}"><td><b>${r.ref}</b> · ${esc(r.reinsurer)}<div class="muted small">${esc(r.claim_number)}</div></td><td class="num">${r.currency} ${fmt(c.amount)}</td><td><span class="pill ${c.status}">${c.status}</span></td><td class="muted small">${esc(profileName(c.verified_by))} · ${fdt(c.verified_at)}${c.verify_note ? '<br>' + esc(c.verify_note) : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nothing yet.</div>'}</div>`;
+  bindPop($('#view'));
+  $$('[data-ver]').forEach(b => b.onclick = () => verifyReceipt(b.dataset.ver, true));
+  $$('[data-rej]').forEach(b => b.onclick = () => verifyReceipt(b.dataset.rej, false));
+  $$('#view a[data-open]').forEach(a => a.onclick = e => { e.preventDefault(); openDrawer(a.dataset.open); });
+  bindOpen();
+}
+function verifyReceipt(id, ok) {
+  const c = S.receipts.find(x => x.id === id), r = S.recoveries.find(x => x.id === c.recovery_id);
+  openModal({
+    title: ok ? 'Verify proof of payment' : 'Reject receipt', submit: ok ? 'Verify' : 'Reject', danger: !ok,
+    body: `<p>${r.ref} · ${esc(r.reinsurer)} · <b>${r.currency} ${fmt(c.amount)}</b> received ${fdate(c.receipt_date)}${c.bank ? ' into ' + esc(c.bank) : ''}.</p>
+      ${ok ? '' : `<div class="note warn" style="margin-bottom:10px">Rejecting removes this amount from “recovered to date”. If the claim was archived it comes back to the register.</div>`}
+      <div class="form"><label class="full">${ok ? 'Note (optional)' : 'Reason'}<textarea name="note" ${ok ? '' : 'required'} placeholder="${ok ? 'e.g. Agreed to ZB statement 14 Oct' : 'e.g. Not on bank statement / wrong amount'}"></textarea></label></div>`,
+    onSubmit: async fd => {
+      await API.updateReceipt(id, {status: ok ? 'verified' : 'rejected', verified_by: S.me.id, verified_at: new Date().toISOString(), verify_note: fd.get('note') || null});
+      if (!ok) await API.insertActivities([{recovery_id: r.id, kind: 'system', note: `Receipt of ${r.currency} ${fmt(c.amount)} rejected by finance: ${fd.get('note')}`}]);
+      toast(ok ? 'Verified' : 'Receipt rejected', ok ? 'good' : ''); await reload(true);
+    }
+  });
+}
+
+/* ---------------------------------------------------------------------
+   REPORTS / EXPORTS
+   --------------------------------------------------------------------- */
+function exportRegister(list, filename, archive = false) {
+  const head = ['Ref','Currency','Date sent to finance','Days','Aging','Linear ID','Client Name','Claim Number','Payee','Reinsurer','Arrangement','Responsible','Original Claim Amount','RI Share','Recovery Amount','Recovered To Date','Unverified','Percentage Recovered','Outstanding Balance','Status','Closed','Payment Status to Client','Next follow-up','Latest comment','Latest comment date','Banks','POP files'];
+  const rows = list.map(r => [r.ref, r.currency, r.date_sent, r._days, AGING[agingIndex(r._days ?? 0)][1], r.linear_id, r.client_name, r.claim_number, r.payee, r.reinsurer, r.arrangement, r.responsible,
+    r.claim_amount, r.ri_share, r.recovery_amount, r._rec, r._pending, round2(r._pct * 100) / 100, r._out, r.status, r.closed_at ? String(r.closed_at).slice(0, 10) : '', r.client_payment_status, r.next_follow_up, r._lastComment, r._lastCommentAt ? String(r._lastCommentAt).slice(0, 10) : '',
+    [...new Set(r._receipts.map(c => c.bank).filter(Boolean))].join(', '), r._receipts.filter(c => c.pop_path).length]);
+  const ws = XLSX.utils.aoa_to_sheet([head, ...rows]); ws['!cols'] = head.map((h, i) => ({wch: [6, 8, 9, 10].includes(i) ? 22 : 14}));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, archive ? 'Archive' : 'Register');
+  const rc = S.receipts.filter(c => list.some(r => r.id === c.recovery_id)).map(c => { const r = list.find(x => x.id === c.recovery_id); return [r.ref, r.claim_number, r.reinsurer, r.currency, c.amount, c.receipt_date, c.method, c.bank, c.reference, c.status, profileName(c.created_by), c.pop_name || '']; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Ref','Claim Number','Reinsurer','Currency','Amount','Date received','Method','Bank','Reference','Status','Recorded by','POP file'], ...rc]), 'Receipts');
+  XLSX.writeFile(wb, filename);
+}
+function viewReports() {
+  const ris = [...new Set(S.recoveries.filter(r => !r._closed).map(r => r.reinsurer))].sort();
+  $('#view').innerHTML = `<div class="grid g2">
+    <div class="card"><div class="card-h"><h3>Reinsurer statement</h3></div><div class="card-b">
+      <p class="muted">Outstanding recoveries for one reinsurer — send it to the reinsurer or broker when following up.</p>
+      <div class="form"><label>Reinsurer<select id="stRi">${opts(ris)}</select></label><label>Currency<select id="stC">${opts(['USD','ZWG'], S.ccy)}</select></label></div>
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="stGo">${icon('dl')} Download statement</button></div></div></div>
+    <div class="card"><div class="card-h"><h3>Full exports</h3></div><div class="card-b">
+      <p class="muted">Everything in the system, including the archive, with a Receipts sheet listing every payment and POP.</p>
+      <div class="row"><button class="btn" data-ex="USD">${icon('dl')} All USD</button><button class="btn" data-ex="ZWG">${icon('dl')} All ZWG</button><button class="btn" id="exCtl">${icon('dl')} Controller summary</button></div></div></div>
+  </div>`;
+  $('#stGo').onclick = () => {
+    const ri = $('#stRi').value, c = $('#stC').value; const list = S.recoveries.filter(r => r.reinsurer === ri && r.currency === c && !r._closed).sort(by('date_sent'));
+    if (!list.length) return toast(`No outstanding ${c} recoveries for ${ri}`, 'bad');
+    const aoa = [[`${CONFIG.COMPANY}`], [`Statement of reinsurance recoveries due — ${ri}`], [`As at ${fdate(todayISO())} · Currency ${c}`], [],
+      ['Our ref','Claim Number','Insured / client','Payee','Date paid','Claim amount','Your share','Amount due','Received','Balance outstanding','Days outstanding'],
+      ...list.map(r => [r.ref, r.claim_number, r.client_name, r.payee, r.date_sent, r.claim_amount, r.ri_share, r.recovery_amount, r._rec, r._out, r._days]),
+      [], ['', '', '', '', 'TOTAL', list.reduce((s, r) => s + r.claim_amount, 0), '', list.reduce((s, r) => s + r.recovery_amount, 0), list.reduce((s, r) => s + r._rec, 0), list.reduce((s, r) => s + r._out, 0)]];
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [12, 22, 34, 26, 12, 14, 10, 14, 14, 16, 10].map(w => ({wch: w}));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Statement'); XLSX.writeFile(wb, `Recoveries_statement_${ri.replace(/\W+/g, '_')}_${c}_${todayISO()}.xlsx`);
+  };
+  $$('[data-ex]').forEach(b => b.onclick = () => exportRegister(S.recoveries.filter(r => r.currency === b.dataset.ex).sort(by('date_sent')), `Recoveries_ALL_${b.dataset.ex}_${todayISO()}.xlsx`));
+  $('#exCtl').onclick = () => {
+    const y = todayISO().slice(0, 5) + '01-01', m = todayISO().slice(0, 8) + '01'; const out = [['Controller','Currency','Open items','Outstanding','Collected MTD','Collected YTD','Fully recovered (all time)','Need follow-up']];
+    controllers().concat([null]).forEach(cn => ['USD','ZWG'].forEach(c => { const l = S.recoveries.filter(r => (r.responsible || null) === cn && r.currency === c); if (!l.length) return;
+      const rc = l.flatMap(r => r._receipts.filter(x => x.status !== 'rejected'));
+      out.push([cn || 'Unassigned', c, l.filter(r => !r._closed).length, round2(l.filter(r => !r._closed).reduce((s, r) => s + r._out, 0)), round2(rc.filter(x => x.receipt_date >= m).reduce((s, x) => s + +x.amount, 0)), round2(rc.filter(x => x.receipt_date >= y).reduce((s, x) => s + +x.amount, 0)), l.filter(r => r.status === 'recovered').length, l.filter(r => r._rem).length]); }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(out), 'Controllers'); XLSX.writeFile(wb, `Controller_summary_${todayISO()}.xlsx`);
+  };
+}
+
+/* ---------------------------------------------------------------------
+   AUDIT TRAIL
+   --------------------------------------------------------------------- */
+async function viewAudit() {
+  $('#view').innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';
+  const a = await API.audit({limit: 300});
+  const recOf = id => S.recoveries.find(r => r.id === id) || S.recoveries.find(r => r.id === S.receipts.find(c => c.id === id)?.recovery_id);
+  $('#view').innerHTML = `<div class="note" style="margin-bottom:14px">Every change to recoveries, receipts, reinsurers and users is recorded automatically — who, what and when. Nothing can be edited or removed from this log.</div>
+    <div class="card"><div class="card-b">${auditList(a)}</div></div>`;
+  $$('#view .tl li').forEach((li, i) => { const r = recOf(a[i].record_id); if (r) li.querySelector('b').insertAdjacentHTML('afterend', ` <a href="#" data-open="${r.id}">${esc(r.ref)}</a>`); });
+  $$('#view a[data-open]').forEach(el => el.onclick = e => { e.preventDefault(); if (el.dataset.open) openDrawer(el.dataset.open); });
+}
+
+/* ---------------------------------------------------------------------
+   SETTINGS (admin)
+   --------------------------------------------------------------------- */
+function viewSettings() {
+  const st = S.settings; const counts = {}; S.recoveries.forEach(r => counts[r.reinsurer] = (counts[r.reinsurer] || 0) + 1);
+  const ris = [...S.reinsurers].filter(r => r.id).sort((a, b) => (b.active !== false) - (a.active !== false) || a.name.localeCompare(b.name));
+  $('#view').innerHTML = `
+  <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Users & roles</h3>${MODE === 'demo' ? '<button class="btn sm" id="addUser">Add demo user</button>' : '<span class="muted small">People appear here after they create an account</span>'}</div>
+    <div class="tbl-wrap" style="max-height:none"><table class="t"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>“Responsible” name</th><th>Email reminders</th><th>Active</th></tr></thead><tbody>
+    ${S.profiles.map(p => `<tr data-pid="${p.id}"><td><b>${esc(p.full_name)}</b></td><td class="muted">${esc(p.email)}</td>
+      <td><select data-f="role">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${p.role === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><input data-f="controller_name" value="${esc(p.controller_name)}" list="ctlNames" placeholder="${p.role === 'credit_control' ? 'e.g. M. Makumbe' : ''}" style="padding:5px 8px;border:1px solid var(--line-strong);border-radius:6px"></td>
+      <td><input type="checkbox" data-f="email_reminders" ${p.email_reminders !== false ? 'checked' : ''}></td><td><input type="checkbox" data-f="active" ${p.active !== false ? 'checked' : ''}></td></tr>`).join('')}
+    </tbody></table><datalist id="ctlNames">${controllers().map(c => `<option>${esc(c)}`).join('')}</datalist></div>
+    <div class="card-b small muted">A credit controller's “Responsible” name must match the name used on recoveries (e.g. <i>M. Makumbe</i>) so their reminders and dashboard line link up.</div></div>
+
+  <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Reinsurers</h3><button class="btn sm" id="addRi">${icon('plus')} Add</button><button class="btn sm" id="mergeRi">Merge duplicates</button></div>
+    <div class="tbl-wrap" style="max-height:480px"><table class="t"><thead><tr><th>Name</th><th>Default controller</th><th>Contact email</th><th class="num">Recoveries</th><th>Active</th></tr></thead><tbody>
+    ${ris.map(r => `<tr data-rid="${r.id}"><td><input data-f="name" value="${esc(r.name)}" style="padding:5px 8px;border:1px solid var(--line-strong);border-radius:6px;width:100%"></td>
+      <td><select data-f="default_controller"><option value="">—</option>${opts(controllers(), r.default_controller)}</select></td>
+      <td><input data-f="contact_email" value="${esc(r.contact_email)}" type="email" style="padding:5px 8px;border:1px solid var(--line-strong);border-radius:6px"></td>
+      <td class="num">${counts[r.name] || 0}</td><td><input type="checkbox" data-f="active" ${r.active !== false ? 'checked' : ''}></td></tr>`).join('')}</tbody></table></div></div>
+
+  <div class="grid g2">
+    <div class="card"><div class="card-h"><h3>Reminder rules</h3></div><form class="card-b" id="rules"><div class="form">
+      <label>Flag if no follow-up for (days)<input name="follow_up_days" type="number" min="1" max="90" value="${st.follow_up_days ?? 7}"></label>
+      <label>Grace after a missed promise (days)<input name="promise_grace_days" type="number" min="0" max="30" value="${st.promise_grace_days ?? 0}"></label>
+      <label class="full chk"><input type="checkbox" name="require_pop" ${st.require_pop !== false ? 'checked' : ''}> Proof of payment is required to record a recovery</label></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary">Save rules</button></div></form></div>
+    <div class="card"><div class="card-h"><h3>Daily email reminders (Power Automate)</h3></div><div class="card-b small">
+      ${MODE === 'supabase' ? `<p>Endpoint: <code style="word-break:break-all">${esc(CONFIG.SUPABASE_URL)}/rest/v1/rpc/reminder_digest</code></p><p>See <b>SETUP.md → Power Automate</b> for the 5-step flow. The token lives in the <code>digest_config</code> table (Supabase → SQL editor: <code>select token from digest_config;</code>).</p>`
+       : '<p>Email reminders switch on once the tool is connected to Supabase. See SETUP.md.</p>'}
+      </div></div>
+  </div>`;
+  $$('[data-pid] [data-f]').forEach(el => el.onchange = async () => { const id = el.closest('tr').dataset.pid; const f = el.dataset.f; const v = el.type === 'checkbox' ? el.checked : (el.value.trim() || null);
+    try { await API.updateProfile(id, {[f]: v}); toast('Saved', 'good'); await reload(true); } catch (e) { toast(e.message, 'bad'); } });
+  $$('[data-rid] [data-f]').forEach(el => el.onchange = async () => { const id = el.closest('tr').dataset.rid; const f = el.dataset.f; const v = el.type === 'checkbox' ? el.checked : (el.value.trim() || null);
+    if (f === 'name' && (!v || S.reinsurers.some(r => r.name.toLowerCase() === v.toLowerCase() && r.id !== id))) { toast('That name is empty or already exists — use Merge instead', 'bad'); return viewSettings(); }
+    try { await API.updateReinsurer(id, {[f]: v}); toast('Saved', 'good'); await reload(true); } catch (e) { toast(e.message, 'bad'); } });
+  $('#rules').onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target);
+    await API.updateSettings({follow_up_days: +fd.get('follow_up_days'), promise_grace_days: +fd.get('promise_grace_days'), require_pop: !!fd.get('require_pop')}); toast('Rules saved', 'good'); reload(true); };
+  $('#addRi').onclick = () => openModal({title: 'Add reinsurer', body: `<div class="form"><label class="full">Name<input name="n" required></label></div>`, onSubmit: async fd => { await API.addReinsurers([fd.get('n').trim()]); toast('Added', 'good'); await reload(true); }});
+  $('#mergeRi').onclick = () => { const names = [...new Set(S.reinsurers.map(r => r.name))].sort();
+    openModal({title: 'Merge reinsurers', submit: 'Merge', body: `<p class="muted">Moves every recovery from the first name to the second and deactivates the first. Use it to clean up spelling variants (e.g. “Capitol Re” → “Capital Re”).</p>
+      <div class="form"><label>Move from<select name="a">${opts(names)}</select></label><label>Into<select name="b">${opts(names)}</select></label></div>`,
+      onSubmit: async fd => { const a = fd.get('a'), b = fd.get('b'); if (a === b) { toast('Pick two different names', 'bad'); return false; } const n = await API.mergeReinsurer(a, b); toast(`Moved ${n} recoveries into ${b}`, 'good'); await reload(true); }}); };
+  if ($('#addUser')) $('#addUser').onclick = () => openModal({title: 'Add demo user', body: `<div class="form"><label>Name<input name="n" required></label><label>Role<select name="r">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>`,
+    onSubmit: async fd => { const n = fd.get('n').trim(); await API.addDemoProfile({full_name: n, email: n.toLowerCase().replace(/[^a-z]+/g, '.') + '@demo.local', role: fd.get('r'), controller_name: fd.get('r') === 'credit_control' ? n : null}); await reload(true); }});
+}
+
+/* ---------------------------------------------------------------------
+   BOOT
+   --------------------------------------------------------------------- */
+async function boot() {
+  if (MODE === 'supabase' && !sb) {
+    if (!window.supabase) { $('#root').innerHTML = '<div class="empty">Could not load the Supabase library — check your internet connection.</div>'; return; }
+    sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') renderAuth(); if (ev === 'PASSWORD_RECOVERY') setTimeout(promptNewPassword, 300); });
+  }
+  const s = await API.session();
+  if (!s) return renderAuth();
+  S.me = {id: s.user.id};
+  await reload(true).catch(() => {});
+  if (!S.me || !S.me.role) { if (MODE === 'demo') { store.set('demo_user', null); return renderAuth(); } S.me = {id: s.user.id, full_name: s.user.email, role: 'viewer'}; }
+  render();
+  const mine = myReminders().length;
+  if (mine) toast(`${mine} recover${mine === 1 ? 'y needs' : 'ies need'} follow-up — see Reminders`);
+  if (!boot.subscribed) { API.subscribe(debounce(() => reload(true), 800)); boot.subscribed = true; }
+}
+function promptNewPassword() {
+  openModal({title: 'Set a new password', body: '<div class="form"><label class="full">New password<input name="p" type="password" minlength="8" required></label></div>',
+    onSubmit: async fd => { const {error} = await sb.auth.updateUser({password: fd.get('p')}); if (error) throw error; toast('Password updated', 'good'); }});
+}
+boot();
+</script>
+</body>
+</html>
